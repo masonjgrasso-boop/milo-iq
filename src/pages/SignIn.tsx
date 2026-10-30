@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { enabledProviders, providerLabels, signInWith, type ProviderId } from '../lib/auth';
 import { Button } from '../components/ui';
 
@@ -53,6 +54,12 @@ export function SignIn() {
 
       <p className="mt-10 text-center text-xs text-slate-400">
         Your data stays in your own Firebase project.
+      </p>
+
+      <p className="mt-4 text-center text-xs text-slate-400">
+        By continuing you agree to our{' '}
+        <Link to="/terms" className="underline hover:text-slate-600">Terms</Link> and{' '}
+        <Link to="/privacy" className="underline hover:text-slate-600">Privacy policy</Link>.
       </p>
     </div>
   );

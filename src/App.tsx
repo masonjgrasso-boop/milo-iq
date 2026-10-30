@@ -7,6 +7,8 @@ import { Onboarding } from './pages/Onboarding';
 import { Today } from './pages/Today';
 import { More } from './pages/More';
 import { Rules } from './pages/Rules';
+import { Account } from './pages/Account';
+import { Privacy, Terms } from './pages/Legal';
 import { Lift } from './pages/Lift';
 import { Spinner } from './components/ui';
 
@@ -45,6 +47,8 @@ export default function App() {
   return (
     <Suspense fallback={<Spinner />}>
       <Routes>
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/onboarding" element={<OnboardingRoute />} />
         <Route element={<RequireProfile />}>
           <Route path="/" element={<Today />} />
@@ -54,6 +58,7 @@ export default function App() {
           <Route path="/photos" element={<Photos />} />
           <Route path="/more" element={<More />} />
           <Route path="/rules" element={<Rules />} />
+          <Route path="/account" element={<Account />} />
           <Route path="/groups" element={<Groups />} />
           <Route path="/groups/:groupId" element={<GroupDetail />} />
         </Route>
