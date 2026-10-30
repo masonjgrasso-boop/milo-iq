@@ -105,3 +105,23 @@ export interface Rule {
   active: boolean;
   createdAt?: unknown;
 }
+
+/** An exercise in the user's list, with a cached copy of its last session. */
+export interface Exercise {
+  id: string;
+  name: string;
+  isCustom: boolean;
+  /** Denormalised so prefilling the next session costs one read, not a query. */
+  lastDate?: DayKey;
+  lastSets?: { weightKg: number; reps: number }[];
+  bestE1rmKg?: number;
+  createdAt?: unknown;
+}
+
+/** One exercise on one day, stored at exercises/{id}/sessions/{YYYY-MM-DD}. */
+export interface WorkoutSession {
+  date: DayKey;
+  sets: { weightKg: number; reps: number }[];
+  bestE1rmKg: number;
+  updatedAt?: unknown;
+}

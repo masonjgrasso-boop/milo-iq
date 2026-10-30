@@ -145,3 +145,38 @@ export function Stat({ label, value, tone = 'neutral' }: {
     </div>
   );
 }
+
+export interface StrengthPoint {
+  label: string;
+  e1rm: number;
+}
+
+/**
+ * Estimated one-rep max per session. A single series, so no legend: the
+ * heading names it.
+ */
+export function StrengthChart({ data, unit }: { data: StrengthPoint[]; unit: string }) {
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+        <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+        <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" />
+        <YAxis {...axisProps} width={44} domain={['dataMin - 5', 'dataMax + 5']} />
+        <Tooltip
+          {...tooltipProps}
+          cursor={{ stroke: CHART_COLORS.reference, strokeDasharray: '4 4' }}
+          formatter={(value) => [`${Number(value).toFixed(1)} ${unit}`, 'Est. 1RM']}
+        />
+        <Line
+          type="monotone"
+          dataKey="e1rm"
+          stroke={CHART_COLORS.onTarget}
+          strokeWidth={2}
+          dot={{ r: 4, strokeWidth: 0, fill: CHART_COLORS.onTarget }}
+          activeDot={{ r: 6 }}
+          isAnimationActive={false}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
