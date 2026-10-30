@@ -6,12 +6,14 @@ import {
   weekdayLabel,
 } from '../lib/dates';
 import { estimateMaintenance, MAX_WINDOW_DAYS } from '../lib/maintenance';
+import { maintenanceBasis, paceSummary } from '../lib/pace';
 import { MaintenanceCard } from '../components/MaintenanceCard';
+import { PaceCard } from '../components/PaceCard';
 import { summarizeDays } from '../lib/summaries';
-import { trendSeries } from '../lib/trend';
+import { latestTrend, trendSeries } from '../lib/trend';
 import { fromKg, weightUnitLabel } from '../lib/units';
-import { Card, Choice } from '../components/ui';
-import { CalorieChart, WeightChart, Stat, type CaloriePoint, type WeightPoint } from '../components/charts';
+import { Card, Choice, Stat } from '../components/ui';
+import { CalorieChart, WeightChart, type CaloriePoint, type WeightPoint } from '../components/charts';
 import { Page } from '../components/Layout';
 
 type Range = 'week' | 'month';
@@ -77,6 +79,20 @@ export function Trends() {
 
   const deficit = summary?.deficit ?? 0;
 
+  // Maintenance is measured once there is enough history and estimated from
+  // onboarding until then; PaceCard says which it is using.
+  const latestWeightKg = latestTrend(trendSeries(windowDays ?? [])) ?? undefined;
+  const basis = maintenanceBasis(maintenance, profile, latestWeightKg);
+  const pace = paceSummary({
+    days: days ?? [],
+    start: from,
+    // Never past today: a half-finished month must not read as missed days.
+    end: to < today ? to : today,
+    maintenanceCalories: basis.calories,
+    targetCalories: target,
+    goal: profile.goal,
+  });
+
   return (
     <Page title="Trends">
       <Choice
@@ -107,8 +123,14 @@ export function Trends() {
         </p>
       </Card>
 
+      {!loading && (
+        <div className="mt-4">
+          <PaceCard pace={pace} scope={range} source={basis.source} />
+        </div>
+      )}
+
       <div className="mt-4">
-        <MaintenanceCard result={maintenance} />
+        <MaintenanceCard result={maintenance} latestWeightKg={latestWeightKg} />
       </div>
 
       <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Intake vs target</h2>

@@ -85,6 +85,26 @@ export function Choice<T extends string>({
   );
 }
 
+/** One labelled figure. Lives here, not in charts, so a card using it
+ *  does not drag Recharts into the main bundle. */
+export function Stat({ label, value, tone = 'neutral' }: {
+  label: string;
+  value: string;
+  tone?: 'neutral' | 'good' | 'warn';
+}) {
+  const colors = {
+    neutral: 'text-slate-900',
+    good: 'text-brand-700',
+    warn: 'text-amber-700',
+  };
+  return (
+    <div>
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className={`mt-0.5 text-lg font-bold ${colors[tone]}`}>{value}</p>
+    </div>
+  );
+}
+
 export function Spinner({ label = 'Loading' }: { label?: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center text-slate-500">

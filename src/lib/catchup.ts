@@ -16,7 +16,13 @@ export const MIN_SPREAD_DAYS = 3;
 export const MAX_SPREAD_DAYS = 7;
 
 export interface CatchUpInput {
-  /** Calories eaten above target across the period. Zero or less needs no plan. */
+  /**
+   * Calories to make up across the period; zero or less needs no plan.
+   *
+   * Callers pass the shortfall against their intended pace — see `gapTotal`
+   * in `./pace` — rather than raw calories over target. Being 400 over a
+   * target that already sits 600 below maintenance is not a 400 problem.
+   */
   surplusCalories: number;
   dailyTarget: number;
   safeMinimum: number;

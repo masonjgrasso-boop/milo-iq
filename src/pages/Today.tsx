@@ -5,13 +5,17 @@ import { useDay } from '../hooks/useDay';
 import { useDayRange } from '../hooks/useDayRange';
 import { deleteFood, listFoods, saveFood, touchFood } from '../data/foods';
 import { listRules } from '../data/rules';
-import { todayKey, friendlyDayLabel, addDays, startOfWeek } from '../lib/dates';
+import { todayKey, friendlyDayLabel, addDays, startOfMonth, startOfWeek } from '../lib/dates';
 import { formatWeight, fromKg, toKg, weightUnitLabel } from '../lib/units';
-import { planCatchUpForUser, surplusFrom } from '../lib/catchup';
+import { planCatchUpForUser } from '../lib/catchup';
+import { estimateMaintenance, MAX_WINDOW_DAYS } from '../lib/maintenance';
+import { maintenanceBasis, paceSummary } from '../lib/pace';
+import { latestTrend, trendSeries } from '../lib/trend';
 import type { Rule, SavedFood } from '../lib/types';
 import { Button, Card, NumberInput } from '../components/ui';
 import { FoodAdder } from '../components/FoodAdder';
 import { CatchUpCard } from '../components/CatchUpCard';
+import { PaceCard } from '../components/PaceCard';
 import { RuleChecklist } from '../components/RuleChecklist';
 import { Page } from '../components/Layout';
 
@@ -27,11 +31,15 @@ export function Today() {
 
   const [rules, setRules] = useState<Rule[]>([]);
 
-  // One fortnight-wide read serves both the catch-up look-back and this
-  // week's rule counts, instead of two overlapping queries.
+  // One read serves everything on this screen: the week and month pace
+  // figures, the maintenance window, the catch-up look-back and the rule
+  // counts. At most 31 small documents, and the persistent cache means
+  // re-opening the screen costs nothing.
   const lookback = useMemo(() => {
     const today = todayKey();
-    return { from: addDays(today, -13), to: today };
+    const monthStart = startOfMonth(today);
+    const windowStart = addDays(today, -(MAX_WINDOW_DAYS - 1));
+    return { from: monthStart < windowStart ? monthStart : windowStart, to: today };
   }, []);
   const { days: history } = useDayRange(lookback.from, lookback.to);
 
@@ -46,6 +54,17 @@ export function Today() {
   );
   const weekDays = useMemo(
     () => history?.filter((past) => past.date >= startOfWeek(todayKey())) ?? [],
+    [history],
+  );
+
+  // Maintenance: measured once there is enough history, the onboarding
+  // estimate until then. Everything below is framed against this number.
+  const maintenance = useMemo(
+    () => estimateMaintenance(history ?? [], todayKey()),
+    [history],
+  );
+  const latestWeightKg = useMemo(
+    () => latestTrend(trendSeries(history ?? [])) ?? undefined,
     [history],
   );
 
@@ -71,11 +90,28 @@ export function Today() {
   const percent = Math.min(100, Math.round((eaten / target) * 100));
   const isToday = date === todayKey();
 
-  const catchUp = planCatchUpForUser(
-    surplusFrom(recentDays ?? [], target),
-    target,
-    profile.sex,
-  );
+  // Cheap filters over at most 31 days already in memory, so these sit below
+  // the profile guard as plain values rather than memoised hooks.
+  const basis = maintenanceBasis(maintenance, profile, latestWeightKg);
+  const paceFor = (start: string, end: string) =>
+    paceSummary({
+      days: history ?? [],
+      start,
+      end,
+      maintenanceCalories: basis.calories,
+      targetCalories: target,
+      goal: profile.goal,
+    });
+
+  const today = todayKey();
+  // Shown including today, so the card reflects what has just been logged.
+  const weekPace = paceFor(startOfWeek(today), today);
+  const monthPace = paceFor(startOfMonth(today), today);
+  // The plan is built from completed days only: a day still in progress must
+  // never be counted as a shortfall before dinner.
+  const weekToDate = paceFor(startOfWeek(today), addDays(today, -1));
+
+  const catchUp = planCatchUpForUser(weekToDate.gapTotal, target, profile.sex);
   const missedDays = (recentDays ?? []).filter((past) => past.calories === 0).length;
 
   async function handleSaveWeight() {
@@ -178,9 +214,20 @@ export function Today() {
         </p>
       )}
 
+      {history && isToday && (
+        <div className="mt-4">
+          <PaceCard pace={weekPace} scope="week" source={basis.source} />
+        </div>
+      )}
+
       {recentDays && isToday && (
         <div className="mt-4">
-          <CatchUpCard plan={catchUp} missedDays={missedDays} />
+          <CatchUpCard
+            plan={catchUp}
+            week={weekToDate}
+            month={monthPace}
+            missedDays={missedDays}
+          />
         </div>
       )}
 

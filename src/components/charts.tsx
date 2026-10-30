@@ -128,24 +128,6 @@ export function WeightChart({ data, unit, showTrend = false }: {
 }
 
 /** A single headline number. Clearer than a chart when there is one value. */
-export function Stat({ label, value, tone = 'neutral' }: {
-  label: string;
-  value: string;
-  tone?: 'neutral' | 'good' | 'warn';
-}) {
-  const colors = {
-    neutral: 'text-slate-900',
-    good: 'text-brand-700',
-    warn: 'text-amber-700',
-  };
-  return (
-    <div>
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className={`mt-0.5 text-lg font-bold ${colors[tone]}`}>{value}</p>
-    </div>
-  );
-}
-
 export interface StrengthPoint {
   label: string;
   e1rm: number;

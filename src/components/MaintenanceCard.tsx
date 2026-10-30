@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/auth-context';
 import { saveProfile } from '../lib/profile';
 import { CONFIDENCE_LABELS, MIN_DAYS, type MaintenanceResult } from '../lib/maintenance';
+import { maintenanceBasis } from '../lib/pace';
 import { dailyCalorieDelta, SAFE_MIN_CALORIES } from '../lib/targets';
 import { Button, Card } from './ui';
 
@@ -21,7 +22,11 @@ const CONFIDENCE_STYLES = {
   high: 'bg-brand-100 text-brand-700',
 } as const;
 
-export function MaintenanceCard({ result }: { result: MaintenanceResult }) {
+export function MaintenanceCard({ result, latestWeightKg }: {
+  result: MaintenanceResult;
+  /** Current trend weight, so the starting estimate does not go stale. */
+  latestWeightKg?: number;
+}) {
   const { user, profile, setProfile } = useAuth();
   const [saving, setSaving] = useState(false);
 
@@ -36,12 +41,29 @@ export function MaintenanceCard({ result }: { result: MaintenanceResult }) {
           : 'Keep weighing in over the next week or two so the trend can settle.';
 
     const progress = Math.min(100, Math.round((result.daysLogged / MIN_DAYS) * 100));
+    // Until there is a measurement, show the onboarding estimate rather than
+    // nothing — labelled, so it is never mistaken for the real figure.
+    const estimate = maintenanceBasis(result, profile, latestWeightKg).calories;
 
     return (
       <Card>
-        <h3 className="text-sm font-semibold text-slate-900">Your real maintenance</h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-sm font-semibold text-slate-900">Your real maintenance</h3>
+          <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+            Starting estimate
+          </span>
+        </div>
+
+        <p className="mt-2 text-4xl font-bold text-slate-900">
+          {estimate.toLocaleString()}{' '}
+          <span className="text-lg font-semibold text-slate-500">cal/day</span>
+        </p>
+
         <p className="mt-2 text-sm text-slate-600">{BLURB}</p>
-        <p className="mt-2 text-sm font-medium text-slate-700">{message}</p>
+        <p className="mt-2 text-sm font-medium text-slate-700">
+          This is the formula estimate from your height, weight, age and activity. {message}
+        </p>
+
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
           <div className="h-full rounded-full bg-brand-500" style={{ width: `${progress}%` }} />
         </div>
