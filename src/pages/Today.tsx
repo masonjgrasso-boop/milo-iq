@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/auth-context';
 import { useDay } from '../hooks/useDay';
+import { useDayRange } from '../hooks/useDayRange';
 import { deleteFood, listFoods, saveFood, touchFood } from '../data/foods';
 import { todayKey, friendlyDayLabel, addDays } from '../lib/dates';
 import { fromKg, toKg, weightUnitLabel } from '../lib/units';
+import { planCatchUpForUser, surplusFrom } from '../lib/catchup';
 import type { SavedFood } from '../lib/types';
 import { Button, Card, NumberInput } from '../components/ui';
 import { FoodAdder } from '../components/FoodAdder';
+import { CatchUpCard } from '../components/CatchUpCard';
 import { Page } from '../components/Layout';
 
 export function Today() {
@@ -16,6 +19,14 @@ export function Today() {
 
   const [foods, setFoods] = useState<SavedFood[]>([]);
   const [weightInput, setWeightInput] = useState('');
+
+  // Catch-up looks only at completed days. Judging a day that is still in
+  // progress would tell someone they are "over" before dinner.
+  const lookback = useMemo(() => {
+    const today = todayKey();
+    return { from: addDays(today, -7), to: addDays(today, -1) };
+  }, []);
+  const { days: recentDays } = useDayRange(lookback.from, lookback.to);
 
   useEffect(() => {
     if (user) listFoods(user.uid).then(setFoods);
@@ -36,6 +47,13 @@ export function Today() {
   const remaining = target - eaten;
   const percent = Math.min(100, Math.round((eaten / target) * 100));
   const isToday = date === todayKey();
+
+  const catchUp = planCatchUpForUser(
+    surplusFrom(recentDays ?? [], target),
+    target,
+    profile.sex,
+  );
+  const missedDays = (recentDays ?? []).filter((past) => past.calories === 0).length;
 
   async function handleSaveWeight() {
     const value = Number(weightInput);
@@ -119,6 +137,12 @@ export function Today() {
         <p role="alert" className="mt-3 text-sm text-red-600">
           {error}
         </p>
+      )}
+
+      {recentDays && isToday && (
+        <div className="mt-4">
+          <CatchUpCard plan={catchUp} missedDays={missedDays} />
+        </div>
       )}
 
       <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Add food</h2>
