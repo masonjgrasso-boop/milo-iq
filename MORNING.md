@@ -21,31 +21,24 @@ f9dd9f3 Phase 1: project setup, auth, and onboarding
 
 ---
 
-## Read this first: three things need you
+## Read this first: one thing left for you
 
-Everything else works right now. These three do not, and I could not do them for you.
+Cloud Storage is on and the security rules are deployed, so photos **and** groups both
+work now. Only the GitHub push is still waiting on you.
 
-### 1. Turn on Cloud Storage — photos will not work without it (2 minutes)
+### 1. Turn on Cloud Storage — done
 
-1. Go to https://console.firebase.google.com and open **milo-iq**
-2. Left sidebar → **Build → Storage**
-3. Click **Get started**
-4. It will ask about security rules — click **Next** (we deploy our own in step 2)
-5. Pick the same location you chose for Firestore → **Done**
+### 2. Deploy the security rules — done
 
-### 2. Deploy the security rules (1 minute)
+Deployed 30 October 2026. Both files compiled clean and were released:
+`storage.rules` to `firebase.storage`, `firestore.rules` to `cloud.firestore`. Your
+database is no longer running the Phase 1 rules, so groups and sharing are live.
 
-I was blocked from deploying — correctly, since you said not to deploy anything. But
-**your Firestore still has only the Phase 1 rules on it**, which know nothing about
-groups. Groups will not work until you run this, and Storage has no rules at all yet.
-
-Open a terminal in `C:\Users\mason\milo-iq` and run:
+If you ever edit either file, redeploy with:
 
 ```
 firebase deploy --only firestore:rules,storage
 ```
-
-Run step 1 before this, or the storage part will fail.
 
 ### 3. Phase 9 — the GitHub push (when you're ready)
 
@@ -104,13 +97,12 @@ Work down this list — it's ordered so each step sets up the next.
 21. The graph needs two separate days to appear, so this one takes until tomorrow.
 
 ### Photos tab
-22. **This needs step 1 above done first.** Otherwise you'll get an error message, which
-    is itself the correct behaviour.
+22. Cloud Storage is enabled and its rules are deployed, so this should work.
 23. Upload a photo. It compresses on your device before uploading.
 24. Tap it to view full size; tap **Compare** on two different weeks for side-by-side.
 
 ### Groups (More → Groups)
-25. **This needs step 2 above done first.**
+25. The group rules are deployed, so this should work.
 26. Create a group, tick "I am coaching this group".
 27. You'll get a 6-character invite code.
 28. Tick a few share boxes — note that **nothing is shared until you tick it**.
@@ -134,7 +126,8 @@ Being straight with you about the limits of what I checked:
 - **I cannot click through the UI.** I verified every route serves, the whole app
   type-checks, and all 259 tests pass — but I have not seen a single screen rendered. If
   something looks wrong visually, that's the most likely place for it.
-- **Photo upload is untested end to end**, because Cloud Storage isn't enabled yet.
+- **Photo upload is untested end to end.** Storage is enabled and its rules are live,
+  but I cannot pick a file and upload it through the UI.
 - **Group sharing is untested with two real accounts.** The security rules are tested
   thoroughly against the emulator, but the UI flow of two people in one group is not.
 - **Account deletion has never been run.** It's destructive, so I wrote it and tested the
