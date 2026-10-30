@@ -10,6 +10,11 @@ import { CONFIDENCE_LABELS, MIN_DAYS, type MaintenanceResult } from '../lib/main
 import { dailyCalorieDelta, SAFE_MIN_CALORIES } from '../lib/targets';
 import { Button, Card } from './ui';
 
+// Stated the same way whether or not there is a number to show yet.
+const BLURB =
+  'Milo IQ compares your actual intake and weight trend to accurately calculate your ' +
+  'maintenance calories. No guesswork. The more you log over time, the more accurate it gets.';
+
 const CONFIDENCE_STYLES = {
   low: 'bg-slate-100 text-slate-600',
   medium: 'bg-amber-100 text-amber-700',
@@ -35,10 +40,8 @@ export function MaintenanceCard({ result }: { result: MaintenanceResult }) {
     return (
       <Card>
         <h3 className="text-sm font-semibold text-slate-900">Your real maintenance</h3>
-        <p className="mt-2 text-sm text-slate-600">
-          Milo IQ works out how many calories you actually burn from your own logs,
-          rather than a formula. {message}
-        </p>
+        <p className="mt-2 text-sm text-slate-600">{BLURB}</p>
+        <p className="mt-2 text-sm font-medium text-slate-700">{message}</p>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
           <div className="h-full rounded-full bg-brand-500" style={{ width: `${progress}%` }} />
         </div>
@@ -85,9 +88,10 @@ export function MaintenanceCard({ result }: { result: MaintenanceResult }) {
         <span className="text-lg font-semibold text-slate-500">cal/day</span>
       </p>
 
-      <p className="mt-2 text-sm text-slate-600">
-        Measured from {result.daysLogged} days of logs and {result.weighIns} weigh-ins —
-        your own numbers, not a formula.
+      <p className="mt-2 text-sm text-slate-600">{BLURB}</p>
+
+      <p className="mt-1.5 text-xs text-slate-500">
+        Measured from {result.daysLogged} days of logs and {result.weighIns} weigh-ins.
       </p>
 
       {differs && (

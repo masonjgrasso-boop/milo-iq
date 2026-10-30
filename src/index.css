@@ -25,3 +25,17 @@ body {
 input, select, textarea {
   font-size: 16px;
 }
+
+/* The save confirmation, rising into place just above the tab bar. */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(0.5rem) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-toast-in {
+  animation: toast-in 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-toast-in { animation: none; }
+}

@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/auth-context';
+import { useToast } from '../context/toast-context';
 import { emptyDay, getDay, saveDay } from '../data/days';
 import { refreshSummaries } from '../data/summaries';
 import type { DayKey } from '../lib/dates';
@@ -17,6 +18,7 @@ const totalCalories = (entries: FoodEntry[]): number =>
 
 export function useDay(date: DayKey) {
   const { user, profile } = useAuth();
+  const notify = useToast();
   const uid = user?.uid;
 
   const [day, setDay] = useState<DayLog | null>(null);
@@ -36,7 +38,7 @@ export function useDay(date: DayKey) {
   }, [uid, date]);
 
   const persist = useCallback(
-    async (next: DayLog) => {
+    async (next: DayLog, confirmation: string) => {
       if (!uid || !profile) return;
       // Show the change straight away; logging should never feel like waiting.
       setDay(next);
@@ -45,20 +47,24 @@ export function useDay(date: DayKey) {
       try {
         await saveDay(uid, next);
         await refreshSummaries(uid, date, profile.calorieTarget);
+        // Confirm it landed. Without this a save is indistinguishable from
+        // nothing happening at all.
+        notify(confirmation);
       } catch {
         setError('Could not save. Your change is still here — check your connection.');
+        notify('Could not save. Check your connection.', 'error');
       } finally {
         setSaving(false);
       }
     },
-    [uid, date, profile],
+    [uid, date, profile, notify],
   );
 
   const addEntry = useCallback(
     (entry: Omit<FoodEntry, 'id'>) => {
       const current = day ?? emptyDay(date);
       const entries = [...current.entries, { ...entry, id: newEntryId() }];
-      return persist({ ...current, entries, calories: totalCalories(entries) });
+      return persist({ ...current, entries, calories: totalCalories(entries) }, 'Added');
     },
     [day, date, persist],
   );
@@ -67,7 +73,7 @@ export function useDay(date: DayKey) {
     (entryId: string) => {
       const current = day ?? emptyDay(date);
       const entries = current.entries.filter((entry) => entry.id !== entryId);
-      return persist({ ...current, entries, calories: totalCalories(entries) });
+      return persist({ ...current, entries, calories: totalCalories(entries) }, 'Removed');
     },
     [day, date, persist],
   );
@@ -78,7 +84,7 @@ export function useDay(date: DayKey) {
       const next = { ...current };
       if (weightKg === undefined) delete next.weightKg;
       else next.weightKg = weightKg;
-      return persist(next);
+      return persist(next, weightKg === undefined ? 'Weight cleared' : 'Weight saved');
     },
     [day, date, persist],
   );
@@ -89,7 +95,7 @@ export function useDay(date: DayKey) {
       const rules = { ...(current.rules ?? {}) };
       if (value === undefined) delete rules[ruleId];
       else rules[ruleId] = value;
-      return persist({ ...current, rules });
+      return persist({ ...current, rules }, 'Saved');
     },
     [day, date, persist],
   );

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/auth-context';
+import { useToast } from '../context/toast-context';
 import { useDay } from '../hooks/useDay';
 import { useDayRange } from '../hooks/useDayRange';
 import { deleteFood, listFoods, saveFood, touchFood } from '../data/foods';
 import { listRules } from '../data/rules';
 import { todayKey, friendlyDayLabel, addDays, startOfWeek } from '../lib/dates';
-import { fromKg, toKg, weightUnitLabel } from '../lib/units';
+import { formatWeight, fromKg, toKg, weightUnitLabel } from '../lib/units';
 import { planCatchUpForUser, surplusFrom } from '../lib/catchup';
 import type { Rule, SavedFood } from '../lib/types';
 import { Button, Card, NumberInput } from '../components/ui';
@@ -16,6 +17,7 @@ import { Page } from '../components/Layout';
 
 export function Today() {
   const { user, profile } = useAuth();
+  const notify = useToast();
   const [date, setDate] = useState(todayKey());
   const { day, loading, saving, error, addEntry, removeEntry, setWeight, setRuleValue } =
     useDay(date);
@@ -78,20 +80,36 @@ export function Today() {
 
   async function handleSaveWeight() {
     const value = Number(weightInput);
-    if (!Number.isFinite(value) || value <= 0) return;
+    if (!Number.isFinite(value) || value <= 0) {
+      notify('That does not look like a weight. Try again.', 'error');
+      return;
+    }
+    // useDay confirms the save, so there is nothing to announce here.
     await setWeight(toKg(value, profile!.units));
   }
 
   async function handleSaveFood(food: Pick<SavedFood, 'name' | 'servingGrams' | 'caloriesPerServing'>) {
     if (!user) return;
-    const saved = await saveFood(user.uid, food);
-    setFoods((current) => [...current, saved]);
+    try {
+      const saved = await saveFood(user.uid, food);
+      setFoods((current) => [...current, saved]);
+      notify(`${saved.name} saved to your foods`);
+    } catch {
+      notify('Could not save that food. Check your connection.', 'error');
+    }
   }
 
   async function handleDeleteFood(foodId: string) {
     if (!user) return;
+    const previous = foods;
     setFoods((current) => current.filter((food) => food.id !== foodId));
-    await deleteFood(user.uid, foodId);
+    try {
+      await deleteFood(user.uid, foodId);
+      notify('Food removed');
+    } catch {
+      setFoods(previous);
+      notify('Could not remove that food. Check your connection.', 'error');
+    }
   }
 
   return (
@@ -239,9 +257,26 @@ export function Today() {
             </Button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
-          Weigh in whenever you can. Milo IQ follows the trend, not any single day.
-        </p>
+        {day?.weightKg === undefined ? (
+          <p className="mt-2 text-xs text-slate-500">
+            Weigh in whenever you can. Milo IQ follows the trend, not any single day.
+          </p>
+        ) : (
+          <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-brand-700">
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" aria-hidden="true">
+              <path
+                d="M4 12.5l5 5L20 6.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {formatWeight(day.weightKg, profile.units)} logged for{' '}
+            {friendlyDayLabel(date).toLowerCase()}
+          </p>
+        )}
       </Card>
     </Page>
   );

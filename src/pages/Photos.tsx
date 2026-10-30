@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/auth-context';
+import { useToast } from '../context/toast-context';
 import { deletePhoto, listPhotos, uploadPhoto, type ProgressPhoto } from '../data/photos';
 import { formatBytes } from '../lib/images';
 import { todayKey, toWeekKey, weekKeyLabel, type WeekKey } from '../lib/dates';
@@ -8,6 +9,7 @@ import { Page } from '../components/Layout';
 
 export function Photos() {
   const { user } = useAuth();
+  const notify = useToast();
   const [photos, setPhotos] = useState<ProgressPhoto[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,12 +44,14 @@ export function Photos() {
         photo,
         ...(current ?? []).filter((item) => item.week !== photo.week),
       ]);
+      notify(`Photo saved for ${weekKeyLabel(photo.week)}`);
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error && err.message.includes('not an image')
           ? 'That file is not an image.'
-          : 'Upload failed. Check your connection and that Cloud Storage is enabled.',
-      );
+          : 'Upload failed. Check your connection and that Cloud Storage is enabled.';
+      setError(message);
+      notify(message, 'error');
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -56,9 +60,16 @@ export function Photos() {
 
   async function handleDelete(week: WeekKey) {
     if (!user) return;
+    const previous = photos;
     setPhotos((current) => (current ?? []).filter((photo) => photo.week !== week));
     setCompare((current) => current.filter((item) => item !== week));
-    await deletePhoto(user.uid, week);
+    try {
+      await deletePhoto(user.uid, week);
+      notify('Photo deleted');
+    } catch {
+      setPhotos(previous);
+      notify('Could not delete that photo. Check your connection.', 'error');
+    }
   }
 
   function toggleCompare(week: WeekKey) {

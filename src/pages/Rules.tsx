@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
+import { useToast } from '../context/toast-context';
 import { useDayRange } from '../hooks/useDayRange';
 import { createRule, deleteRule, listRules, updateRule } from '../data/rules';
 import { addDays, startOfWeek, todayKey, WEEKDAY_LABELS } from '../lib/dates';
@@ -13,6 +14,7 @@ import { Page } from '../components/Layout';
 
 export function Rules() {
   const { user } = useAuth();
+  const notify = useToast();
   const today = todayKey();
   const [rules, setRules] = useState<Rule[]>([]);
   const [adding, setAdding] = useState(false);
@@ -31,23 +33,47 @@ export function Rules() {
 
   async function handleCreate(rule: Omit<Rule, 'id'>) {
     if (!user) return;
-    const created = await createRule(user.uid, rule);
-    setRules((current) => [...current, created]);
-    setAdding(false);
+    try {
+      const created = await createRule(user.uid, rule);
+      setRules((current) => [...current, created]);
+      setAdding(false);
+      notify('Rule created');
+    } catch {
+      notify('Could not create that rule. Check your connection.', 'error');
+    }
   }
 
+  // Each of these shows the change immediately, then puts it back if the
+  // write fails — a rule that looks paused but is not would be worse than a
+  // slow tap.
   async function handleToggleActive(rule: Rule) {
     if (!user) return;
+    const paused = rule.active;
     setRules((current) =>
       current.map((item) => (item.id === rule.id ? { ...item, active: !item.active } : item)),
     );
-    await updateRule(user.uid, rule.id, { active: !rule.active });
+    try {
+      await updateRule(user.uid, rule.id, { active: !rule.active });
+      notify(paused ? 'Rule paused' : 'Rule resumed');
+    } catch {
+      setRules((current) =>
+        current.map((item) => (item.id === rule.id ? { ...item, active: rule.active } : item)),
+      );
+      notify('Could not save that. Check your connection.', 'error');
+    }
   }
 
   async function handleDelete(rule: Rule) {
     if (!user) return;
+    const previous = rules;
     setRules((current) => current.filter((item) => item.id !== rule.id));
-    await deleteRule(user.uid, rule.id);
+    try {
+      await deleteRule(user.uid, rule.id);
+      notify('Rule deleted');
+    } catch {
+      setRules(previous);
+      notify('Could not delete that rule. Check your connection.', 'error');
+    }
   }
 
   return (
@@ -97,8 +123,10 @@ export function Rules() {
                 {weekly
                   ? `${weekly.used} of ${weekly.limit} used this week`
                   : summary.applicable === 0
-                    ? 'Nothing to judge yet this week'
-                    : `${summary.met} of ${summary.applicable} days this week (${summary.percent}%)`}
+                    ? 'Nothing counted yet this week'
+                    : `${summary.met} of ${summary.applicable} ${
+                        summary.applicable === 1 ? 'day' : 'days'
+                      } so far this week (${summary.percent}%)`}
               </div>
 
               <div className="mt-3 flex gap-4 text-sm">

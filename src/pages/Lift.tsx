@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
+import { useToast } from '../context/toast-context';
 import { createExercise, listExercises, seedStarterExercises } from '../data/workouts';
 import { friendlyDayLabel } from '../lib/dates';
 import { fromKg, weightUnitLabel } from '../lib/units';
@@ -10,6 +11,7 @@ import { Page } from '../components/Layout';
 
 export function Lift() {
   const { user, profile } = useAuth();
+  const notify = useToast();
   const [exercises, setExercises] = useState<Exercise[] | null>(null);
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState(false);
@@ -44,12 +46,17 @@ export function Lift() {
 
   async function handleAdd() {
     if (!user || !newName.trim()) return;
-    const created = await createExercise(user.uid, newName.trim());
-    setExercises((current) =>
-      [...(current ?? []), created].sort((a, b) => a.name.localeCompare(b.name)),
-    );
-    setNewName('');
-    setAdding(false);
+    try {
+      const created = await createExercise(user.uid, newName.trim());
+      setExercises((current) =>
+        [...(current ?? []), created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setNewName('');
+      setAdding(false);
+      notify(`${created.name} added`);
+    } catch {
+      notify('Could not add that exercise. Check your connection.', 'error');
+    }
   }
 
   return (

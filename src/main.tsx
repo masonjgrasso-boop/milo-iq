@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './context/AuthProvider';
+import { ToastProvider } from './context/ToastProvider';
 import { SetupNotice } from './pages/SetupNotice';
 import { isFirebaseConfigured } from './lib/firebase';
 import './index.css';
@@ -12,7 +13,9 @@ import './index.css';
 const tree = isFirebaseConfigured ? (
   <BrowserRouter>
     <AuthProvider>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </AuthProvider>
   </BrowserRouter>
 ) : (

@@ -79,7 +79,6 @@ Work down this list — it's ordered so each step sets up the next.
 10. The maintenance card should say **"2 more days of food logs to go"** or similar — it
     deliberately refuses to show a number until 14 days. That's correct behaviour, not a
     bug.
-11. BMI should show with your healthy weight range.
 
 ### Rules (More → Rules)
 12. Create a yes/no rule, e.g. "No weekday drinking", and select Mon–Fri only.

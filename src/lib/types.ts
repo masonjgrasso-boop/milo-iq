@@ -103,6 +103,11 @@ export interface Rule {
   /** Monday-indexed weekdays the rule applies to. Empty means every day. */
   daysOfWeek: number[];
   active: boolean;
+  /**
+   * The first day the rule counts for. A rule cannot have been kept or broken
+   * before it existed, so days before this are never judged against it.
+   */
+  startDate?: DayKey;
   createdAt?: unknown;
 }
 

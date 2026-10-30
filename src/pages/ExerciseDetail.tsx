@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
+import { useToast } from '../context/toast-context';
 import { getExercise, getSession, listSessions, saveSession } from '../data/workouts';
 import { sessionBests, tryEstimateOneRepMax, type WorkoutSet } from '../lib/strength';
 import { friendlyDayLabel, shortDateLabel, todayKey } from '../lib/dates';
@@ -20,6 +21,7 @@ const emptySet: DraftSet = { weight: '', reps: '' };
 export function ExerciseDetail() {
   const { exerciseId } = useParams<{ exerciseId: string }>();
   const { user, profile } = useAuth();
+  const notify = useToast();
   const date = todayKey();
 
   const [exercise, setExercise] = useState<Exercise | null>(null);
@@ -87,13 +89,21 @@ export function ExerciseDetail() {
   async function handleSave() {
     if (!user || !exercise || parsedSets.length === 0) return;
     setSaving(true);
-    const session = await saveSession(user.uid, exercise, date, parsedSets);
-    setSessions((current) => [
-      ...current.filter((item) => item.date !== date),
-      session,
-    ].sort((a, b) => a.date.localeCompare(b.date)));
-    setSaving(false);
-    setSaved(true);
+    try {
+      const session = await saveSession(user.uid, exercise, date, parsedSets);
+      setSessions((current) => [
+        ...current.filter((item) => item.date !== date),
+        session,
+      ].sort((a, b) => a.date.localeCompare(b.date)));
+      setSaved(true);
+      notify(
+        `Saved ${parsedSets.length} ${parsedSets.length === 1 ? 'set' : 'sets'} of ${exercise.name}`,
+      );
+    } catch {
+      notify('Could not save that workout. Check your connection.', 'error');
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) {

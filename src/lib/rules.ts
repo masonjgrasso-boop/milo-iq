@@ -9,9 +9,16 @@ import type { DayLog, Rule } from './types';
 
 export type DayStatus = 'met' | 'missed' | 'pending' | 'off';
 
-/** Whether a rule is in force on a given date. */
+/**
+ * Whether a rule is in force on a given date.
+ *
+ * Days before the rule was created are not in force. Without this, a rule
+ * added on Friday would report the whole week back to Monday as missed, which
+ * is both wrong and exactly the kind of false failure this app avoids.
+ */
 export function appliesOn(rule: Rule, date: DayKey): boolean {
   if (!rule.active) return false;
+  if (rule.startDate !== undefined && date < rule.startDate) return false;
   if (rule.daysOfWeek.length === 0) return true;
   return rule.daysOfWeek.includes(weekdayIndex(date));
 }
@@ -33,7 +40,9 @@ export function dayStatus(rule: Rule, day: DayLog, today: DayKey): DayStatus {
   if (!appliesOn(rule, day.date)) return 'off';
   const value = day.rules?.[rule.id];
   if (value === undefined) return day.date >= today ? 'pending' : 'missed';
-  return isMet(rule, value) ? 'met' : 'missed';
+  if (isMet(rule, value)) return 'met';
+  // Today is still in progress: 4,000 steps at lunchtime is not a failed day.
+  return day.date >= today ? 'pending' : 'missed';
 }
 
 /**
@@ -101,8 +110,9 @@ export function weeklyLimitStatus(
 ): WeeklyLimitStatus {
   const start = startOfWeek(date);
   const end = addDays(start, 6);
+  const from = rule.startDate !== undefined && rule.startDate > start ? rule.startDate : start;
   const used = days.filter(
-    (day) => day.date >= start && day.date <= end && day.rules?.[rule.id] === true,
+    (day) => day.date >= from && day.date <= end && day.rules?.[rule.id] === true,
   ).length;
 
   return {
@@ -124,7 +134,14 @@ export function weeklyLimitStreak(rule: Rule, days: DayLog[], today: DayKey): nu
     null,
   );
 
-  while (earliest !== null && cursor >= startOfWeek(earliest)) {
+  // Weeks before the rule existed are not weeks it was respected in, so the
+  // walk stops at whichever came later: the rule's start or the first log.
+  const floor =
+    rule.startDate !== undefined && earliest !== null && rule.startDate > earliest
+      ? rule.startDate
+      : earliest;
+
+  while (floor !== null && cursor >= startOfWeek(floor)) {
     if (weeklyLimitStatus(rule, days, cursor).withinLimit) streak++;
     else break;
     cursor = addDays(cursor, -7);

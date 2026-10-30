@@ -10,8 +10,6 @@ import { MaintenanceCard } from '../components/MaintenanceCard';
 import { summarizeDays } from '../lib/summaries';
 import { trendSeries } from '../lib/trend';
 import { fromKg, weightUnitLabel } from '../lib/units';
-import { BMI_CATEGORY_LABELS, bmiCategory, calculateBmi, healthyWeightRangeKg } from '../lib/bmi';
-import { formatWeight } from '../lib/units';
 import { Card, Choice } from '../components/ui';
 import { CalorieChart, WeightChart, Stat, type CaloriePoint, type WeightPoint } from '../components/charts';
 import { Page } from '../components/Layout';
@@ -77,12 +75,6 @@ export function Trends() {
   });
   const weighIns = weightPoints.filter((point) => point.weight !== null).length;
 
-  // Prefer the most recent weigh-in over the figure typed at onboarding.
-  const latestWeightKg =
-    [...past].reverse().find((day) => day.weightKg !== undefined)?.weightKg ?? profile.weightKg;
-  const bmi = calculateBmi(latestWeightKg, profile.heightCm);
-  const healthy = healthyWeightRangeKg(profile.heightCm);
-
   const deficit = summary?.deficit ?? 0;
 
   return (
@@ -143,29 +135,6 @@ export function Trends() {
         )}
       </Card>
 
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">BMI</h2>
-      <Card>
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-3xl font-bold text-slate-900">{bmi.toFixed(1)}</p>
-            <p className="mt-0.5 text-sm font-medium text-slate-600">
-              {BMI_CATEGORY_LABELS[bmiCategory(bmi)]}
-            </p>
-          </div>
-          <p className="text-right text-xs text-slate-500">
-            Healthy range for your height
-            <br />
-            <span className="font-medium text-slate-700">
-              {formatWeight(healthy.minKg, profile.units, 0)} &ndash;{' '}
-              {formatWeight(healthy.maxKg, profile.units, 0)}
-            </span>
-          </p>
-        </div>
-        <p className="mt-3 text-xs text-slate-500">
-          BMI is a rough population measure. It knows nothing about your muscle mass or
-          build, so treat it as one number among several rather than a verdict.
-        </p>
-      </Card>
     </Page>
   );
 }

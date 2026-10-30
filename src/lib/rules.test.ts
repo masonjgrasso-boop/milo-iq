@@ -41,6 +41,13 @@ describe('appliesOn', () => {
     expect(appliesOn(yesNo, '2026-03-08')).toBe(false); // Sunday
   });
 
+  it('does not apply before the rule was created', () => {
+    const started = { ...steps, startDate: '2026-03-04' };
+    expect(appliesOn(started, '2026-03-03')).toBe(false);
+    expect(appliesOn(started, '2026-03-04')).toBe(true);
+    expect(appliesOn(started, '2026-03-05')).toBe(true);
+  });
+
   it('never applies when the rule is switched off', () => {
     expect(appliesOn({ ...steps, active: false }, '2026-03-04')).toBe(false);
   });
@@ -81,6 +88,21 @@ describe('dayStatus', () => {
   it('reads the recorded value', () => {
     expect(dayStatus(yesNo, day('2026-03-03', true), today)).toBe('met');
     expect(dayStatus(yesNo, day('2026-03-03', false), today)).toBe('missed');
+  });
+
+  it('leaves today pending when the number is short of the goal', () => {
+    const partial: DayLog = { date: today, calories: 0, entries: [], rules: { r2: 4_000 } };
+    expect(dayStatus(steps, partial, today)).toBe('pending');
+  });
+
+  it('counts today as met as soon as the goal is reached', () => {
+    const done: DayLog = { date: today, calories: 0, entries: [], rules: { r2: 10_000 } };
+    expect(dayStatus(steps, done, today)).toBe('met');
+  });
+
+  it('is off for days before the rule existed', () => {
+    const started = { ...yesNo, startDate: '2026-03-04' };
+    expect(dayStatus(started, day('2026-03-03'), today)).toBe('off');
   });
 });
 
@@ -137,9 +159,24 @@ describe('currentStreak', () => {
 
   it('works for numeric rules', () => {
     const days = buildDays('2026-03-04', today, {
+      '2026-03-04': { r2: 11_000 }, '2026-03-05': { r2: 10_000 }, '2026-03-06': { r2: 10_500 },
+    });
+    expect(currentStreak(steps, days, today)).toBe(3);
+  });
+
+  it('holds the streak while today is still short of the goal', () => {
+    // 4,000 steps at lunchtime is a day in progress, not a broken streak.
+    const days = buildDays('2026-03-04', today, {
       '2026-03-04': { r2: 11_000 }, '2026-03-05': { r2: 10_000 }, '2026-03-06': { r2: 4_000 },
     });
-    expect(currentStreak(steps, days, today)).toBe(0); // today already fell short
+    expect(currentStreak(steps, days, today)).toBe(2);
+  });
+
+  it('is ended by a past day that fell short', () => {
+    const days = buildDays('2026-03-04', today, {
+      '2026-03-04': { r2: 11_000 }, '2026-03-05': { r2: 4_000 }, '2026-03-06': { r2: 10_000 },
+    });
+    expect(currentStreak(steps, days, today)).toBe(1); // today only
   });
 });
 
@@ -155,6 +192,31 @@ describe('weekSummary', () => {
     expect(summary.applicable).toBe(5); // weekdays only
     expect(summary.met).toBe(4);
     expect(summary.percent).toBe(80);
+  });
+
+  it('ignores the days before the rule was created', () => {
+    // The reported bug: a daily rule added on Thursday read the whole week
+    // back to Monday as missed, showing "0 of 4 days".
+    const rule = { ...steps, startDate: '2026-03-05' };
+    const days = buildDays('2026-03-02', '2026-03-08');
+    const summary = weekSummary(rule, days, today);
+    expect(summary.applicable).toBe(3); // Thu, Fri, Sat — not Mon to Wed
+    expect(summary.met).toBe(0);
+  });
+
+  it('counts today as soon as it is checked off', () => {
+    const rule = { ...steps, startDate: '2026-03-06' };
+    const unchecked = weekSummary(rule, buildDays('2026-03-06', '2026-03-08'), '2026-03-06');
+    expect(unchecked.applicable).toBe(0);
+
+    const checked = weekSummary(
+      rule,
+      buildDays('2026-03-06', '2026-03-08', { '2026-03-06': { r2: 12_000 } }),
+      '2026-03-06',
+    );
+    expect(checked.applicable).toBe(1);
+    expect(checked.met).toBe(1);
+    expect(checked.percent).toBe(100);
   });
 
   it('reports zero rather than dividing by zero', () => {
@@ -191,6 +253,16 @@ describe('weeklyLimitStatus', () => {
   });
 });
 
+describe('weeklyLimitStatus with a start date', () => {
+  it('ignores uses recorded before the rule existed', () => {
+    const rule = { ...eatOut, startDate: '2026-03-05' };
+    const days = buildDays('2026-03-02', '2026-03-08', {
+      '2026-03-03': { r3: true }, '2026-03-06': { r3: true },
+    });
+    expect(weeklyLimitStatus(rule, days, '2026-03-08').used).toBe(1);
+  });
+});
+
 describe('weeklyLimitStreak', () => {
   it('counts completed weeks within the limit', () => {
     const days = buildDays('2026-02-16', '2026-03-08', {
@@ -207,6 +279,13 @@ describe('weeklyLimitStreak', () => {
       '2026-03-02': { r3: true }, // current week
     });
     expect(weeklyLimitStreak(eatOut, days, '2026-03-05')).toBe(0);
+  });
+
+  it('does not credit weeks before the rule existed', () => {
+    const rule = { ...eatOut, startDate: '2026-03-02' };
+    // Eight weeks of clean logs, but the rule has only existed for one.
+    const days = buildDays('2026-01-05', '2026-03-08');
+    expect(weeklyLimitStreak(rule, days, '2026-03-11')).toBe(1);
   });
 
   it('returns zero with no history', () => {
