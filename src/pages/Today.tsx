@@ -1,0 +1,194 @@
+import { useEffect, useState } from 'react';
+import { useAuth } from '../context/auth-context';
+import { useDay } from '../hooks/useDay';
+import { deleteFood, listFoods, saveFood, touchFood } from '../data/foods';
+import { todayKey, friendlyDayLabel, addDays } from '../lib/dates';
+import { fromKg, toKg, weightUnitLabel } from '../lib/units';
+import type { SavedFood } from '../lib/types';
+import { Button, Card, NumberInput } from '../components/ui';
+import { FoodAdder } from '../components/FoodAdder';
+import { Page } from '../components/Layout';
+
+export function Today() {
+  const { user, profile } = useAuth();
+  const [date, setDate] = useState(todayKey());
+  const { day, loading, saving, error, addEntry, removeEntry, setWeight } = useDay(date);
+
+  const [foods, setFoods] = useState<SavedFood[]>([]);
+  const [weightInput, setWeightInput] = useState('');
+
+  useEffect(() => {
+    if (user) listFoods(user.uid).then(setFoods);
+  }, [user]);
+
+  // Reflect whatever is already stored for the day being viewed.
+  useEffect(() => {
+    if (!profile) return;
+    setWeightInput(
+      day?.weightKg === undefined ? '' : fromKg(day.weightKg, profile.units).toFixed(1),
+    );
+  }, [day?.weightKg, profile]);
+
+  if (!profile) return null;
+
+  const target = profile.calorieTarget;
+  const eaten = day?.calories ?? 0;
+  const remaining = target - eaten;
+  const percent = Math.min(100, Math.round((eaten / target) * 100));
+  const isToday = date === todayKey();
+
+  async function handleSaveWeight() {
+    const value = Number(weightInput);
+    if (!Number.isFinite(value) || value <= 0) return;
+    await setWeight(toKg(value, profile!.units));
+  }
+
+  async function handleSaveFood(food: Pick<SavedFood, 'name' | 'servingGrams' | 'caloriesPerServing'>) {
+    if (!user) return;
+    const saved = await saveFood(user.uid, food);
+    setFoods((current) => [...current, saved]);
+  }
+
+  async function handleDeleteFood(foodId: string) {
+    if (!user) return;
+    setFoods((current) => current.filter((food) => food.id !== foodId));
+    await deleteFood(user.uid, foodId);
+  }
+
+  return (
+    <Page title={friendlyDayLabel(date)}>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setDate(addDays(date, -1))}
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100"
+        >
+          &larr; Previous
+        </button>
+        {!isToday && (
+          <button
+            type="button"
+            onClick={() => setDate(todayKey())}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-brand-600 hover:bg-brand-50"
+          >
+            Jump to today
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => setDate(addDays(date, 1))}
+          disabled={isToday}
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500
+            hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent"
+        >
+          Next &rarr;
+        </button>
+      </div>
+
+      <Card className="border-brand-200 bg-brand-50">
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-sm font-medium text-brand-700">Eaten</p>
+            <p className="text-4xl font-bold text-brand-700">{eaten.toLocaleString()}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-medium text-brand-700">
+              {remaining >= 0 ? 'Left' : 'Over'}
+            </p>
+            <p className="text-2xl font-semibold text-brand-700">
+              {Math.abs(remaining).toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-brand-200">
+          <div
+            className={`h-full rounded-full transition-all ${
+              remaining >= 0 ? 'bg-brand-600' : 'bg-amber-500'
+            }`}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+        <p className="mt-2 text-xs text-brand-700">
+          Target {target.toLocaleString()} cal
+          {saving && <span className="ml-2 text-brand-600">Saving…</span>}
+        </p>
+      </Card>
+
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-600">
+          {error}
+        </p>
+      )}
+
+      <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Add food</h2>
+      <FoodAdder
+        savedFoods={foods}
+        onAdd={addEntry}
+        onSaveFood={handleSaveFood}
+        onUseFood={(foodId) => user && touchFood(user.uid, foodId)}
+        onDeleteFood={handleDeleteFood}
+      />
+
+      <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">
+        Logged {day && day.entries.length > 0 && `(${day.entries.length})`}
+      </h2>
+      <Card>
+        {loading ? (
+          <p className="text-sm text-slate-400">Loading…</p>
+        ) : day && day.entries.length > 0 ? (
+          <ul className="divide-y divide-slate-100">
+            {day.entries.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900">{entry.name}</p>
+                  {entry.grams !== undefined && (
+                    <p className="text-xs text-slate-500">{entry.grams} g</p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="font-semibold text-slate-900">
+                    {entry.calories.toLocaleString()}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${entry.name}`}
+                    onClick={() => removeEntry(entry.id)}
+                    className="rounded-lg px-2 py-1 text-slate-300 transition hover:text-red-500"
+                  >
+                    &times;
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-500">Nothing logged yet.</p>
+        )}
+      </Card>
+
+      <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Weight</h2>
+      <Card>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <NumberInput
+              value={weightInput}
+              onChange={(event) => setWeightInput(event.target.value)}
+              placeholder={profile.units === 'metric' ? '80.0' : '176.0'}
+              aria-label={`Weight in ${weightUnitLabel(profile.units)}`}
+            />
+          </div>
+          <span className="pb-3 text-sm text-slate-500">{weightUnitLabel(profile.units)}</span>
+          <div className="w-28">
+            <Button onClick={handleSaveWeight} disabled={!weightInput}>
+              Save
+            </Button>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Weigh in whenever you can. Milo IQ follows the trend, not any single day.
+        </p>
+      </Card>
+    </Page>
+  );
+}

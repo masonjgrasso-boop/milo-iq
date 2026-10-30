@@ -1,7 +1,7 @@
 // Small shared UI pieces. Deliberately plain: the app should feel fast and
 // obvious, so there is no component library here, just a few consistent styles.
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ComponentPropsWithRef, ReactNode } from 'react';
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
@@ -41,7 +41,7 @@ export function Field({
   );
 }
 
-export function NumberInput(props: InputHTMLAttributes<HTMLInputElement>) {
+export function NumberInput(props: ComponentPropsWithRef<'input'>) {
   return (
     <input
       type="number"

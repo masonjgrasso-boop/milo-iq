@@ -1,20 +1,30 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './context/auth-context';
+import { Layout } from './components/Layout';
 import { SignIn } from './pages/SignIn';
 import { Onboarding } from './pages/Onboarding';
-import { Dashboard } from './pages/Dashboard';
+import { Today } from './pages/Today';
+import { More } from './pages/More';
+import { Placeholder } from './pages/Placeholder';
 import { Spinner } from './components/ui';
 
-/** Signed out shows sign-in; signed in without a profile goes to onboarding. */
-function Home() {
+// Charts are a large dependency and most visits only log food, so the chart
+// routes load on demand rather than in the first bundle.
+const Trends = lazy(() => import('./pages/Trends').then((m) => ({ default: m.Trends })));
+
+/**
+ * The signed-in app. Signed-out visitors see the sign-in page, and anyone who
+ * has not finished onboarding is sent there first.
+ */
+function RequireProfile() {
   const { user, profile, loading } = useAuth();
   if (loading) return <Spinner />;
   if (!user) return <SignIn />;
   if (!profile) return <Navigate to="/onboarding" replace />;
-  return <Dashboard />;
+  return <Layout />;
 }
 
-/** Onboarding is only for signed-in users who have not finished it yet. */
 function OnboardingRoute() {
   const { user, profile, loading } = useAuth();
   if (loading) return <Spinner />;
@@ -24,10 +34,24 @@ function OnboardingRoute() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/onboarding" element={<OnboardingRoute />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={<Spinner />}>
+      <Routes>
+        <Route path="/onboarding" element={<OnboardingRoute />} />
+        <Route element={<RequireProfile />}>
+          <Route path="/" element={<Today />} />
+          <Route path="/trends" element={<Trends />} />
+          <Route
+            path="/lift"
+            element={<Placeholder title="Lift" note="Workout logging arrives in a later phase." />}
+          />
+          <Route
+            path="/photos"
+            element={<Placeholder title="Photos" note="Progress photos arrive in a later phase." />}
+          />
+          <Route path="/more" element={<More />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
