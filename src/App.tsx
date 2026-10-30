@@ -8,12 +8,12 @@ import { Today } from './pages/Today';
 import { More } from './pages/More';
 import { Rules } from './pages/Rules';
 import { Lift } from './pages/Lift';
-import { Placeholder } from './pages/Placeholder';
 import { Spinner } from './components/ui';
 
 // Charts are a large dependency and most visits only log food, so the chart
 // routes load on demand rather than in the first bundle.
 const Trends = lazy(() => import('./pages/Trends').then((m) => ({ default: m.Trends })));
+const Photos = lazy(() => import('./pages/Photos').then((m) => ({ default: m.Photos })));
 const ExerciseDetail = lazy(() =>
   import('./pages/ExerciseDetail').then((m) => ({ default: m.ExerciseDetail })),
 );
@@ -47,10 +47,7 @@ export default function App() {
           <Route path="/trends" element={<Trends />} />
           <Route path="/lift" element={<Lift />} />
           <Route path="/lift/:exerciseId" element={<ExerciseDetail />} />
-          <Route
-            path="/photos"
-            element={<Placeholder title="Photos" note="Progress photos arrive in a later phase." />}
-          />
+          <Route path="/photos" element={<Photos />} />
           <Route path="/more" element={<More />} />
           <Route path="/rules" element={<Rules />} />
         </Route>

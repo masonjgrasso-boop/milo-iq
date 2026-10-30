@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   toDayKey, fromDayKey, addDays, daysBetween, rangeKeys, lastNDays,
   toWeekKey, toMonthKey, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
-  weekdayIndex, weekdayLabel,
+  weekdayIndex, weekdayLabel, weekKeyToMonday, weekKeyLabel,
 } from './dates';
 
 describe('day keys', () => {
@@ -121,5 +121,27 @@ describe('weekdays', () => {
   it('labels the day', () => {
     expect(weekdayLabel('2026-03-04')).toBe('Wed');
     expect(weekdayLabel('2026-03-08')).toBe('Sun');
+  });
+});
+
+describe('week key round trip', () => {
+  it('maps a week key back to its Monday', () => {
+    expect(weekKeyToMonday('2026-W10')).toBe('2026-03-02');
+    expect(weekKeyToMonday('2026-W01')).toBe('2025-12-29');
+  });
+
+  it('is the inverse of toWeekKey for every week of a year', () => {
+    for (let day = '2026-01-01'; day <= '2026-12-31'; day = addDays(day, 1)) {
+      expect(weekKeyToMonday(toWeekKey(day))).toBe(startOfWeek(day));
+    }
+  });
+
+  it('handles a year with 53 ISO weeks', () => {
+    expect(weekKeyToMonday('2026-W53')).toBe('2026-12-28');
+    expect(toWeekKey('2026-12-28')).toBe('2026-W53');
+  });
+
+  it('labels a week by its Monday', () => {
+    expect(weekKeyLabel('2026-W10')).toContain('Week of');
   });
 });

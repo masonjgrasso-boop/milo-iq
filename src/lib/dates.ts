@@ -119,3 +119,21 @@ export function friendlyDayLabel(key: DayKey, today: DayKey = todayKey()): strin
     day: 'numeric',
   });
 }
+
+/** The Monday that starts a given ISO week key. The inverse of toWeekKey. */
+export function weekKeyToMonday(week: WeekKey): DayKey {
+  const [yearPart, weekPart] = week.split('-W');
+  // 4 January is always in ISO week 1, so week 1's Monday anchors everything.
+  const jan4 = new Date(Number(yearPart), 0, 4);
+  const week1Monday = new Date(jan4);
+  week1Monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+
+  const monday = new Date(week1Monday);
+  monday.setDate(week1Monday.getDate() + (Number(weekPart) - 1) * 7);
+  return toDayKey(monday);
+}
+
+/** "Week of Mar 2" reads better than "2026-W10". */
+export function weekKeyLabel(week: WeekKey): string {
+  return `Week of ${shortDateLabel(weekKeyToMonday(week))}`;
+}
