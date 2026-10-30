@@ -43,6 +43,18 @@ export function More() {
         </Link>
       </Card>
 
+      <Card className="mt-3">
+        <Link to="/groups" className="flex items-center justify-between">
+          <span>
+            <span className="block text-sm font-semibold text-slate-900">Groups</span>
+            <span className="block text-xs text-slate-500">
+              Share only what you choose, with people you choose
+            </span>
+          </span>
+          <span aria-hidden="true" className="text-slate-400">&rarr;</span>
+        </Link>
+      </Card>
+
       <div className="mt-6">
         <Button variant="secondary" onClick={() => signOutUser()}>
           Sign out

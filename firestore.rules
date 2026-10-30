@@ -1,16 +1,41 @@
 rules_version = '2';
 
-// Phase 1 rules: a user may read and write only their own data, and nothing
-// else is reachable. Later phases widen this for groups and coaches, with
-// emulator tests covering both the allow and the deny cases.
+// Milo IQ security rules.
+//
+// Two principles:
+//   1. A user's own data is reachable only by that user.
+//   2. A group member can read only the "mirror" documents other members
+//      publish. Those contain nothing but what each member chose to share, so
+//      unshared data is not merely filtered out — it was never written
+//      anywhere the group can read.
+//
+// Everything not matched below is denied.
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isOwner(uid) {
-      return request.auth != null && request.auth.uid == uid;
+    function signedIn() {
+      return request.auth != null;
     }
 
-    // users/{uid} and everything beneath it belongs to that user alone.
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isMember(groupId) {
+      return signedIn() && exists(
+        /databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)
+      );
+    }
+
+    function isCoach(groupId) {
+      return signedIn() && get(
+        /databases/$(database)/documents/groups/$(groupId)
+      ).data.coachUid == request.auth.uid;
+    }
+
+    // ---- A user's own data -------------------------------------------------
+
     match /users/{uid} {
       allow read, write: if isOwner(uid);
 
@@ -19,6 +44,62 @@ service cloud.firestore {
       }
     }
 
-    // Anything not matched above is denied by default.
+    // ---- Invite codes ------------------------------------------------------
+    //
+    // Knowing the code is the authorization, so a signed-in user may look one
+    // up. Listing is denied, so codes cannot be enumerated. The group name is
+    // stored here so joining never needs to read the group first — which lets
+    // the group document itself stay members-only.
+
+    match /inviteCodes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ---- Groups ------------------------------------------------------------
+
+    match /groups/{groupId} {
+      // Members only, and never listable: no browsing other people's groups.
+      allow get: if isMember(groupId);
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isCoach(groupId);
+      allow delete: if false;
+
+      // Membership. Each person writes only their own record, so nobody can
+      // add someone else to a group or alter another member's settings.
+      // Deleting your own record is how leaving works, and because every read
+      // rule below checks for that record, access ends the moment it is gone.
+      match /members/{uid} {
+        allow read: if isMember(groupId);
+        allow create: if isOwner(uid)
+          && request.resource.data.uid == uid;
+        allow update: if isOwner(uid)
+          && request.resource.data.role == resource.data.role;
+        allow delete: if isOwner(uid);
+
+        // The mirror: readable by the group, writable only by its owner.
+        match /shared/{document} {
+          allow read: if isMember(groupId);
+          allow write: if isOwner(uid);
+        }
+      }
+
+      // Coach notes. Written by the coach, readable by the coach and by the
+      // member the note is about.
+      match /notes/{noteId} {
+        allow get: if isCoach(groupId)
+          || (signedIn() && resource.data.memberUid == request.auth.uid);
+        allow list: if isCoach(groupId);
+        allow create: if isCoach(groupId)
+          && request.resource.data.coachUid == request.auth.uid;
+        allow update: if false;
+        allow delete: if isCoach(groupId);
+      }
+    }
   }
 }
