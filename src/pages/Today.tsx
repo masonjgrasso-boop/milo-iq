@@ -3,33 +3,54 @@ import { useAuth } from '../context/auth-context';
 import { useDay } from '../hooks/useDay';
 import { useDayRange } from '../hooks/useDayRange';
 import { deleteFood, listFoods, saveFood, touchFood } from '../data/foods';
-import { todayKey, friendlyDayLabel, addDays } from '../lib/dates';
+import { listRules } from '../data/rules';
+import { todayKey, friendlyDayLabel, addDays, startOfWeek } from '../lib/dates';
 import { fromKg, toKg, weightUnitLabel } from '../lib/units';
 import { planCatchUpForUser, surplusFrom } from '../lib/catchup';
-import type { SavedFood } from '../lib/types';
+import type { Rule, SavedFood } from '../lib/types';
 import { Button, Card, NumberInput } from '../components/ui';
 import { FoodAdder } from '../components/FoodAdder';
 import { CatchUpCard } from '../components/CatchUpCard';
+import { RuleChecklist } from '../components/RuleChecklist';
 import { Page } from '../components/Layout';
 
 export function Today() {
   const { user, profile } = useAuth();
   const [date, setDate] = useState(todayKey());
-  const { day, loading, saving, error, addEntry, removeEntry, setWeight } = useDay(date);
+  const { day, loading, saving, error, addEntry, removeEntry, setWeight, setRuleValue } =
+    useDay(date);
 
   const [foods, setFoods] = useState<SavedFood[]>([]);
   const [weightInput, setWeightInput] = useState('');
 
-  // Catch-up looks only at completed days. Judging a day that is still in
-  // progress would tell someone they are "over" before dinner.
+  const [rules, setRules] = useState<Rule[]>([]);
+
+  // One fortnight-wide read serves both the catch-up look-back and this
+  // week's rule counts, instead of two overlapping queries.
   const lookback = useMemo(() => {
     const today = todayKey();
-    return { from: addDays(today, -7), to: addDays(today, -1) };
+    return { from: addDays(today, -13), to: today };
   }, []);
-  const { days: recentDays } = useDayRange(lookback.from, lookback.to);
+  const { days: history } = useDayRange(lookback.from, lookback.to);
+
+  // Catch-up looks only at completed days. Judging a day that is still in
+  // progress would tell someone they are "over" before dinner.
+  const recentDays = useMemo(
+    () =>
+      history?.filter(
+        (past) => past.date >= addDays(todayKey(), -7) && past.date < todayKey(),
+      ) ?? null,
+    [history],
+  );
+  const weekDays = useMemo(
+    () => history?.filter((past) => past.date >= startOfWeek(todayKey())) ?? [],
+    [history],
+  );
 
   useEffect(() => {
-    if (user) listFoods(user.uid).then(setFoods);
+    if (!user) return;
+    listFoods(user.uid).then(setFoods);
+    listRules(user.uid).then(setRules);
   }, [user]);
 
   // Reflect whatever is already stored for the day being viewed.
@@ -190,6 +211,15 @@ export function Today() {
           <p className="text-sm text-slate-500">Nothing logged yet.</p>
         )}
       </Card>
+
+      <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Rules</h2>
+      <RuleChecklist
+        rules={rules}
+        date={date}
+        day={day}
+        weekDays={weekDays}
+        onChange={setRuleValue}
+      />
 
       <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Weight</h2>
       <Card>

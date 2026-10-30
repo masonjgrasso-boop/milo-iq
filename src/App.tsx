@@ -6,6 +6,7 @@ import { SignIn } from './pages/SignIn';
 import { Onboarding } from './pages/Onboarding';
 import { Today } from './pages/Today';
 import { More } from './pages/More';
+import { Rules } from './pages/Rules';
 import { Placeholder } from './pages/Placeholder';
 import { Spinner } from './components/ui';
 
@@ -49,6 +50,7 @@ export default function App() {
             element={<Placeholder title="Photos" note="Progress photos arrive in a later phase." />}
           />
           <Route path="/more" element={<More />} />
+          <Route path="/rules" element={<Rules />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

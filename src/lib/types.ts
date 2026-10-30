@@ -82,3 +82,26 @@ export interface PeriodSummary {
   avgWeightKg: number | null;
   updatedAt?: unknown;
 }
+
+/**
+ * A personal rule the user holds themselves to.
+ *
+ * - `boolean`: did you do it, yes or no ("No weekday drinking")
+ * - `numeric`: did you hit a daily number ("10k steps")
+ * - `weeklyLimit`: on at most N days a week ("Eat out max 1 day/week")
+ */
+export type RuleType = 'boolean' | 'numeric' | 'weeklyLimit';
+
+export interface Rule {
+  id: string;
+  name: string;
+  type: RuleType;
+  /** Daily goal for numeric rules; maximum days per week for weekly limits. */
+  target: number;
+  /** What a numeric rule counts, shown beside the input. */
+  unit?: string;
+  /** Monday-indexed weekdays the rule applies to. Empty means every day. */
+  daysOfWeek: number[];
+  active: boolean;
+  createdAt?: unknown;
+}

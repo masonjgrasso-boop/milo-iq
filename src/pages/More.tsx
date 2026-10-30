@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
 import { signOutUser } from '../lib/auth';
 import { formatHeight, formatWeight } from '../lib/units';
@@ -28,6 +29,18 @@ export function More() {
           <Row label="Age" value={String(profile.age)} />
           <Row label="Activity" value={ACTIVITY_LABELS[profile.activity]} />
         </dl>
+      </Card>
+
+      <Card className="mt-4">
+        <Link to="/rules" className="flex items-center justify-between">
+          <span>
+            <span className="block text-sm font-semibold text-slate-900">Rules</span>
+            <span className="block text-xs text-slate-500">
+              Habits you hold yourself to, with streaks
+            </span>
+          </span>
+          <span aria-hidden="true" className="text-slate-400">&rarr;</span>
+        </Link>
       </Card>
 
       <div className="mt-6">
