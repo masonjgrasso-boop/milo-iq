@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   toDayKey, fromDayKey, addDays, daysBetween, rangeKeys, lastNDays,
   toWeekKey, toMonthKey, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
-  weekdayIndex, weekdayLabel, weekKeyToMonday, weekKeyLabel,
+  weekdayIndex, weekdayLabel, weekKeyToMonday, weekKeyLabel, monthLabel,
 } from './dates';
 
 describe('day keys', () => {
@@ -143,5 +143,14 @@ describe('week key round trip', () => {
 
   it('labels a week by its Monday', () => {
     expect(weekKeyLabel('2026-W10')).toContain('Week of');
+  });
+});
+
+describe('monthLabel', () => {
+  it('names the month and nothing else', () => {
+    expect(monthLabel('2026-03-02')).toBe(
+      new Date(2026, 2, 2).toLocaleDateString(undefined, { month: 'short' }),
+    );
+    expect(monthLabel('2026-03-02')).not.toMatch(/\d/);
   });
 });

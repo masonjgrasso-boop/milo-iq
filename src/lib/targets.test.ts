@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   mifflinStJeorBmr, estimateTdee, dailyCalorieDelta, calculateCalorieTarget,
-  SAFE_MIN_CALORIES, KCAL_PER_KG,
+  SAFE_MIN_CALORIES, KCAL_PER_KG, suggestedTarget,
 } from './targets';
 
 const male = { weightKg: 80, heightCm: 180, age: 30, sex: 'male' as const };
@@ -86,5 +86,29 @@ describe('calculateCalorieTarget', () => {
       goal: 'lose', targetRateKgPerWeek: 1.5,
     });
     expect(r.calorieTarget).toBe(SAFE_MIN_CALORIES.male);
+  });
+});
+
+describe('suggestedTarget', () => {
+  const base = { sex: 'male' as const, targetRateKgPerWeek: 0.45 };
+
+  it('sits below maintenance for a losing goal', () => {
+    const target = suggestedTarget(2750, { ...base, goal: 'lose' });
+    expect(target).toBe(2750 - Math.round(dailyCalorieDelta(0.45)));
+  });
+
+  it('sits above maintenance for a gaining goal', () => {
+    expect(suggestedTarget(2750, { ...base, goal: 'gain' })).toBeGreaterThan(2750);
+  });
+
+  it('is maintenance itself when maintaining', () => {
+    expect(suggestedTarget(2750, { ...base, goal: 'maintain' })).toBe(2750);
+  });
+
+  it('never drops below the safe floor', () => {
+    const target = suggestedTarget(1600, {
+      sex: 'male', goal: 'lose', targetRateKgPerWeek: 1,
+    });
+    expect(target).toBe(SAFE_MIN_CALORIES.male);
   });
 });

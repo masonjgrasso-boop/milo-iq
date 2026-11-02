@@ -13,10 +13,10 @@ import { useWeekSummaries } from '../hooks/useWeekSummaries';
 import {
   addDays, shortDateLabel, todayKey, toWeekKey, weekKeyToMonday, weekdayLabel,
 } from '../lib/dates';
-import { MAX_WINDOW_DAYS } from '../lib/maintenance';
+import { MAX_WINDOW_DAYS, type MaintenanceResult } from '../lib/maintenance';
 import { paceFromTotals, type MaintenanceBasis, type PaceSummary } from '../lib/pace';
 import {
-  dailyDeficitPoints, sumDays, sumWeeks, weekKeysFor, weeklyDeficitPoints,
+  axisTicks, dailyDeficitPoints, sumDays, sumWeeks, weekKeysFor, weeklyDeficitPoints,
   RANGE_DAYS, RANGE_LABELS, type DeficitPoint, type TrendRange,
 } from '../lib/deficit';
 import { trendChangeKg, trendSeries } from '../lib/trend';
@@ -25,6 +25,7 @@ import type { UserProfile } from '../lib/types';
 import { Card, Choice } from '../components/ui';
 import { DeficitChart, WeightChart, type WeightPoint } from '../components/charts';
 import { DeficitSummaryCard } from '../components/DeficitSummaryCard';
+import { MaintenanceBox } from '../components/MaintenanceBox';
 import { Page } from '../components/Layout';
 
 export function Trends() {
@@ -67,7 +68,7 @@ function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }
   const from = useMemo(() => addDays(today, -(span - 1)), [today, span]);
   const { days, loading } = useDayRange(from, today);
 
-  const { basis } = useMaintenanceBasis(days, profile);
+  const { result, basis } = useMaintenanceBasis(days, profile);
 
   const start = addDays(today, -(RANGE_DAYS[range] - 1));
   const inRange = (days ?? []).filter((day) => day.date >= start);
@@ -77,6 +78,7 @@ function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }
     basis.calories,
     range === 'week' ? weekdayLabel : shortDateLabel,
   );
+  const ticks = axisTicks(inRange.map((day) => day.date), range);
 
   const trend = trendSeries(inRange);
   const weightPoints: WeightPoint[] = trend.map((point) => ({
@@ -90,8 +92,10 @@ function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }
       loading={loading}
       range={range}
       profile={profile}
+      result={result}
       basis={basis}
       points={points}
+      ticks={ticks}
       pace={paceFor(sumDays(inRange), basis, profile)}
       weightPoints={weightPoints}
       weightChangeKg={trendChangeKg(trend)}
@@ -113,16 +117,18 @@ function YearView({ profile }: { profile: UserProfile }) {
   // back four weeks.
   const windowFrom = useMemo(() => addDays(today, -(MAX_WINDOW_DAYS - 1)), [today]);
   const { days } = useDayRange(windowFrom, today);
-  const { basis } = useMaintenanceBasis(days, profile);
+  const { result, basis } = useMaintenanceBasis(days, profile);
 
   const found = weeks ?? [];
   const points = weeklyDeficitPoints(keys, found, basis.calories);
+  const mondays = keys.map(weekKeyToMonday);
+  const ticks = axisTicks(mondays, 'year');
 
   // A week's average weight is the right dot at this zoom.
   const byKey = new Map(found.map((week) => [week.key, week]));
   const trend = trendSeries(
-    keys.map((key) => ({
-      date: weekKeyToMonday(key),
+    keys.map((key, index) => ({
+      date: mondays[index],
       weightKg: byKey.get(key)?.avgWeightKg ?? undefined,
     })),
   );
@@ -137,8 +143,10 @@ function YearView({ profile }: { profile: UserProfile }) {
       loading={loading}
       range="year"
       profile={profile}
+      result={result}
       basis={basis}
       points={points}
+      ticks={ticks}
       pace={paceFor(sumWeeks(found), basis, profile)}
       weightPoints={weightPoints}
       weightChangeKg={trendChangeKg(trend)}
@@ -167,13 +175,16 @@ function toDisplay(kg: number | null | undefined, profile: UserProfile): number 
 }
 
 function Body({
-  loading, range, profile, basis, points, pace, weightPoints, weightChangeKg, dense = false,
+  loading, range, profile, result, basis, points, ticks, pace, weightPoints, weightChangeKg,
+  dense = false,
 }: {
   loading: boolean;
   range: TrendRange;
   profile: UserProfile;
+  result: MaintenanceResult;
   basis: MaintenanceBasis;
   points: DeficitPoint[];
+  ticks: string[];
   pace: PaceSummary;
   weightPoints: WeightPoint[];
   weightChangeKg: number | null;
@@ -201,11 +212,16 @@ function Body({
   return (
     <>
       <Card className="mt-4">
-        <DeficitChart data={points} goalDeficit={pace.targetPerDay} dense={dense} />
+        <DeficitChart
+          data={points}
+          goalDeficit={pace.targetPerDay}
+          ticks={ticks}
+          dense={dense}
+        />
       </Card>
 
       <div className="mt-4">
-        <DeficitSummaryCard pace={pace} basis={basis} range={range} sex={profile.sex} />
+        <MaintenanceBox result={result} basis={basis} profile={profile} />
       </div>
 
       <Card className="mt-4">
@@ -214,10 +230,19 @@ function Body({
         </p>
         {weightChangeKg !== null && (
           <div className="mt-3">
-            <WeightChart data={weightPoints} unit={weightUnitLabel(profile.units)} showTrend />
+            <WeightChart
+              data={weightPoints}
+              unit={weightUnitLabel(profile.units)}
+              ticks={ticks}
+              showTrend
+            />
           </div>
         )}
       </Card>
+
+      <div className="mt-4">
+        <DeficitSummaryCard pace={pace} range={range} sex={profile.sex} />
+      </div>
     </>
   );
 }

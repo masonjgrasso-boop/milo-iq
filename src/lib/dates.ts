@@ -137,3 +137,8 @@ export function weekKeyToMonday(week: WeekKey): DayKey {
 export function weekKeyLabel(week: WeekKey): string {
   return `Week of ${shortDateLabel(weekKeyToMonday(week))}`;
 }
+
+/** Short month name such as "Oct", for a year axis. */
+export function monthLabel(key: DayKey): string {
+  return fromDayKey(key).toLocaleDateString(undefined, { month: 'short' });
+}

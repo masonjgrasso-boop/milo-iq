@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  dailyDeficitPoints, weeklyDeficitPoints, weekKeysFor, sumDays, sumWeeks,
+  axisTicks, dailyDeficitPoints, weeklyDeficitPoints, weekKeysFor, sumDays, sumWeeks,
   RANGE_DAYS,
 } from './deficit';
-import { weekdayLabel } from './dates';
+import { weekdayLabel, weekKeyToMonday as weekKeyToMondayFor } from './dates';
 import type { DayLog, PeriodSummary } from './types';
 
 const day = (date: string, calories: number): DayLog => ({ date, calories, entries: [] });
@@ -154,5 +154,60 @@ describe('totals', () => {
       totalCalories: 14_900,
       daysLogged: 7,
     });
+  });
+});
+
+describe('axisTicks', () => {
+  const dates = (from: string, count: number): string[] => {
+    const start = new Date(`${from}T00:00:00`);
+    return Array.from({ length: count }, (_, index) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + index);
+      return date.toISOString().slice(0, 10);
+    });
+  };
+
+  it('labels every day of a week by name', () => {
+    expect(axisTicks(dates('2026-03-02', 7), 'week')).toEqual([
+      'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+    ]);
+  });
+
+  it('labels about five days across a month', () => {
+    const ticks = axisTicks(dates('2026-03-02', 30), 'month');
+    expect(ticks).toHaveLength(30);
+    expect(ticks.filter(Boolean)).toHaveLength(5);
+  });
+
+  it('spaces the month labels a week apart', () => {
+    const ticks = axisTicks(dates('2026-03-02', 30), 'month');
+    const labelled = ticks.map((tick, index) => (tick ? index : -1)).filter((i) => i >= 0);
+    expect(labelled).toEqual([0, 7, 14, 21, 28]);
+  });
+
+  it('labels only the start of each month across a year', () => {
+    const mondays = weekKeysFor('2026-03-08', 365).map((key) => key);
+    const ticks = axisTicks(
+      mondays.map((key) => weekKeyToMondayFor(key)),
+      'year',
+    );
+    // Twelve or thirteen month starts fall inside a 53-week span.
+    const labels = ticks.filter(Boolean);
+    expect(labels.length).toBeGreaterThanOrEqual(12);
+    expect(labels.length).toBeLessThanOrEqual(13);
+    // Month names only, never dates.
+    expect(labels.every((label) => !/\d/.test(label))).toBe(true);
+  });
+
+  it('never labels two adjacent year buckets', () => {
+    const ticks = axisTicks(
+      weekKeysFor('2026-03-08', 365).map((key) => weekKeyToMondayFor(key)),
+      'year',
+    );
+    // Two labels side by side is exactly how an axis gets crowded.
+    const adjacent = ticks.some(
+      (tick, index) => tick !== '' && index + 1 < ticks.length && ticks[index + 1] !== '',
+    );
+    expect(adjacent).toBe(false);
   });
 });

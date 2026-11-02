@@ -93,3 +93,20 @@ export function calculateCalorieTarget(input: TargetInput): TargetResult {
     clampedToFloor,
   };
 }
+
+/**
+ * The daily target that fits the user's goal around a known maintenance
+ * figure. Keeps whatever goal and rate they chose, just anchored to a measured
+ * number instead of a formula, and never below the safe floor.
+ */
+export function suggestedTarget(
+  maintenanceCalories: number,
+  profile: { goal: Goal; sex: Sex; targetRateKgPerWeek: number },
+): number {
+  const delta = profile.goal === 'maintain' ? 0 : dailyCalorieDelta(profile.targetRateKgPerWeek);
+  const direction = profile.goal === 'gain' ? 1 : -1;
+  return Math.max(
+    SAFE_MIN_CALORIES[profile.sex],
+    Math.round(maintenanceCalories + direction * delta),
+  );
+}

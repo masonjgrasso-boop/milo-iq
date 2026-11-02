@@ -6,8 +6,7 @@
 
 import { planRecovery, RECOVERY_DAYS, type CatchUpPlan } from '../lib/catchup';
 import { RANGE_LABELS, type TrendRange } from '../lib/deficit';
-import { CONFIDENCE_LABELS } from '../lib/maintenance';
-import type { MaintenanceBasis, PaceSummary } from '../lib/pace';
+import type { PaceSummary } from '../lib/pace';
 import { SAFE_MIN_CALORIES } from '../lib/targets';
 import type { Sex } from '../lib/types';
 import { Card, Stat } from './ui';
@@ -53,9 +52,8 @@ function verdict(
   );
 }
 
-export function DeficitSummaryCard({ pace, basis, range, sex }: {
+export function DeficitSummaryCard({ pace, range, sex }: {
   pace: PaceSummary;
-  basis: MaintenanceBasis;
   range: TrendRange;
   sex: Sex;
 }) {
@@ -85,14 +83,11 @@ export function DeficitSummaryCard({ pace, basis, range, sex }: {
         {verdict(pace, plan, safeMinimum, pace.targetCalories)}
       </p>
 
+      {/* The maintenance figure itself is named in the box above, so this says
+          only what the numbers are measured over. */}
       <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
-        Calories per day across the {pace.daysLogged}{' '}
-        {pace.daysLogged === 1 ? 'day' : 'days'} you logged in {RANGE_LABELS[range]}.{' '}
-        {basis.source === 'measured'
-          ? `Measured against your maintenance of ${cal(basis.calories)} cal/day` +
-            `${basis.confidence ? ` (${CONFIDENCE_LABELS[basis.confidence].toLowerCase()})` : ''}.`
-          : `Measured against a starting estimate of ${cal(basis.calories)} cal/day — ` +
-            'it gets more accurate the more you log.'}
+        Calories per day against maintenance, across the {pace.daysLogged}{' '}
+        {pace.daysLogged === 1 ? 'day' : 'days'} you logged in {RANGE_LABELS[range]}.
       </p>
     </Card>
   );

@@ -3,13 +3,12 @@
 // Before there is enough data this card says so plainly and counts down,
 // rather than showing a confident-looking number built on three days of logs.
 
-import { useState } from 'react';
 import { useAuth } from '../context/auth-context';
-import { saveProfile } from '../lib/profile';
 import { CONFIDENCE_LABELS, MIN_DAYS, type MaintenanceResult } from '../lib/maintenance';
 import { maintenanceBasis } from '../lib/pace';
-import { dailyCalorieDelta, SAFE_MIN_CALORIES } from '../lib/targets';
-import { Button, Card } from './ui';
+import { suggestedTarget } from '../lib/targets';
+import { UpdateTargetButton } from './UpdateTargetButton';
+import { Card } from './ui';
 
 // Stated the same way whether or not there is a number to show yet.
 const BLURB =
@@ -27,8 +26,7 @@ export function MaintenanceCard({ result, latestWeightKg }: {
   /** Current trend weight, so the starting estimate does not go stale. */
   latestWeightKg?: number;
 }) {
-  const { user, profile, setProfile } = useAuth();
-  const [saving, setSaving] = useState(false);
+  const { profile } = useAuth();
 
   if (!profile) return null;
 
@@ -75,22 +73,8 @@ export function MaintenanceCard({ result, latestWeightKg }: {
   }
 
   // Keep the goal the user chose, just anchored to the measured number.
-  const delta = profile.goal === 'maintain' ? 0 : dailyCalorieDelta(profile.targetRateKgPerWeek);
-  const direction = profile.goal === 'gain' ? 1 : -1;
-  const suggested = Math.max(
-    SAFE_MIN_CALORIES[profile.sex],
-    Math.round(result.maintenanceCalories + direction * delta),
-  );
+  const suggested = suggestedTarget(result.maintenanceCalories, profile);
   const differs = Math.abs(suggested - profile.calorieTarget) >= 50;
-
-  async function applySuggestion() {
-    if (!user || !profile) return;
-    setSaving(true);
-    const next = { ...profile, calorieTarget: suggested };
-    await saveProfile(user.uid, next);
-    setProfile(next);
-    setSaving(false);
-  }
 
   return (
     <Card>
@@ -123,9 +107,7 @@ export function MaintenanceCard({ result, latestWeightKg }: {
             your goal better than your current {profile.calorieTarget.toLocaleString()}.
           </p>
           <div className="mt-3">
-            <Button onClick={applySuggestion} disabled={saving}>
-              {saving ? 'Updating…' : 'Use this target'}
-            </Button>
+            <UpdateTargetButton suggested={suggested} />
           </div>
         </div>
       )}

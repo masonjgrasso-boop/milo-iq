@@ -33,6 +33,17 @@ const axisProps = {
   axisLine: false,
 };
 
+/**
+ * Axis labels are chosen upstream, where the calendar is known, and handed
+ * down as one string per bucket. Recharts is told to keep every tick so the
+ * blanks hold their place, which is what stops labels from colliding or
+ * needing to be rotated.
+ */
+const tickProps = (ticks: string[]) => ({
+  interval: 0 as const,
+  tickFormatter: (_value: string, index: number) => ticks[index] ?? '',
+});
+
 const tooltipProps = {
   contentStyle: {
     borderRadius: 12,
@@ -53,10 +64,12 @@ const tooltipProps = {
  * Three marks on one axis, because all three are calories per day: the bars,
  * a flat line for the deficit the goal asks for, and the running average.
  */
-export function DeficitChart({ data, goalDeficit, dense = false }: {
+export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
   data: DeficitPoint[];
   goalDeficit: number;
-  /** Month and year views have too many bars to label every one. */
+  /** One entry per bar; an empty string leaves that bar unlabelled. */
+  ticks: string[];
+  /** Month and year views pack the bars tighter. */
   dense?: boolean;
 }) {
   return (
@@ -68,12 +81,7 @@ export function DeficitChart({ data, goalDeficit, dense = false }: {
           barCategoryGap={dense ? '10%' : '22%'}
         >
           <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-          <XAxis
-            dataKey="label"
-            {...axisProps}
-            interval={dense ? 'preserveStartEnd' : 0}
-            minTickGap={dense ? 24 : 4}
-          />
+          <XAxis dataKey="label" {...axisProps} {...tickProps(ticks)} />
           <YAxis {...axisProps} width={48} />
           <Tooltip
             {...tooltipProps}
@@ -158,16 +166,18 @@ export interface WeightPoint {
   trend?: number | null;
 }
 
-export function WeightChart({ data, unit, showTrend = false }: {
+export function WeightChart({ data, unit, ticks, showTrend = false }: {
   data: WeightPoint[];
   unit: string;
+  /** Same labels as the chart above it, so the two axes line up. */
+  ticks: string[];
   showTrend?: boolean;
 }) {
   return (
     <ResponsiveContainer width="100%" height={180}>
       <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
         <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-        <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" />
+        <XAxis dataKey="label" {...axisProps} {...tickProps(ticks)} />
         <YAxis {...axisProps} width={44} domain={['dataMin - 1', 'dataMax + 1']} />
         <Tooltip
           {...tooltipProps}

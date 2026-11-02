@@ -10,7 +10,7 @@
 // been logging for weeks.
 
 import {
-  addDays, shortDateLabel, startOfWeek, toWeekKey, weekKeyToMonday,
+  addDays, monthLabel, shortDateLabel, startOfWeek, toWeekKey, weekdayLabel, weekKeyToMonday,
   type DayKey, type WeekKey,
 } from './dates';
 import type { DayLog, PeriodSummary } from './types';
@@ -142,4 +142,32 @@ export function sumWeeks(summaries: PeriodSummary[]): LoggedTotals {
     totalCalories: summaries.reduce((sum, week) => sum + week.totalCalories, 0),
     daysLogged: summaries.reduce((sum, week) => sum + week.daysLogged, 0),
   };
+}
+
+/**
+ * The labels to print under the bars, one per bucket, empty where the axis
+ * should stay blank.
+ *
+ * Thirty date labels do not fit across a phone, and rotating them is worse
+ * than showing fewer. So each range gets a spacing that reads cleanly: day
+ * names for a week, one date a week for a month, one per month for a year.
+ */
+export function axisTicks(dates: DayKey[], range: TrendRange): string[] {
+  if (range === 'week') return dates.map((date) => weekdayLabel(date));
+
+  if (range === 'month') {
+    // Every seventh day, so about five labels across thirty bars.
+    return dates.map((date, index) => (index % 7 === 0 ? shortDateLabel(date) : ''));
+  }
+
+  const monthOf = (date: DayKey) => date.slice(0, 7);
+  return dates.map((date, index) => {
+    // One label where each month begins. The first bucket only earns one if it
+    // genuinely starts a month, so the left edge never shows a cramped pair.
+    const starts =
+      index === 0
+        ? Number(date.slice(8, 10)) <= 7
+        : monthOf(date) !== monthOf(dates[index - 1]);
+    return starts ? monthLabel(date) : '';
+  });
 }
