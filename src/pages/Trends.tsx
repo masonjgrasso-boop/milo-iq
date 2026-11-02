@@ -1,162 +1,238 @@
+// Trends asks one question: am I running the deficit I meant to?
+//
+// One toggle, one graph, one summary, and the weight trend underneath. Periods
+// are rolling rather than calendar, so there is always something to show — a
+// calendar month tells someone who has logged for weeks that they have done
+// nothing, which is the last thing this screen should say.
+
 import { useMemo, useState } from 'react';
 import { useAuth } from '../context/auth-context';
 import { useDayRange } from '../hooks/useDayRange';
+import { useMaintenanceBasis } from '../hooks/useMaintenanceBasis';
+import { useWeekSummaries } from '../hooks/useWeekSummaries';
 import {
-  addDays, endOfMonth, endOfWeek, shortDateLabel, startOfMonth, startOfWeek, todayKey,
-  weekdayLabel,
+  addDays, shortDateLabel, todayKey, toWeekKey, weekKeyToMonday, weekdayLabel,
 } from '../lib/dates';
-import { estimateMaintenance, MAX_WINDOW_DAYS } from '../lib/maintenance';
-import { maintenanceBasis, paceSummary } from '../lib/pace';
-import { MaintenanceCard } from '../components/MaintenanceCard';
-import { PaceCard } from '../components/PaceCard';
-import { summarizeDays } from '../lib/summaries';
-import { latestTrend, trendSeries } from '../lib/trend';
-import { fromKg, weightUnitLabel } from '../lib/units';
-import { Card, Choice, Stat } from '../components/ui';
-import { CalorieChart, WeightChart, type CaloriePoint, type WeightPoint } from '../components/charts';
+import { MAX_WINDOW_DAYS } from '../lib/maintenance';
+import { paceFromTotals, type MaintenanceBasis, type PaceSummary } from '../lib/pace';
+import {
+  dailyDeficitPoints, sumDays, sumWeeks, weekKeysFor, weeklyDeficitPoints,
+  RANGE_DAYS, RANGE_LABELS, type DeficitPoint, type TrendRange,
+} from '../lib/deficit';
+import { trendChangeKg, trendSeries } from '../lib/trend';
+import { formatWeight, fromKg, weightUnitLabel } from '../lib/units';
+import type { UserProfile } from '../lib/types';
+import { Card, Choice } from '../components/ui';
+import { DeficitChart, WeightChart, type WeightPoint } from '../components/charts';
+import { DeficitSummaryCard } from '../components/DeficitSummaryCard';
 import { Page } from '../components/Layout';
-
-type Range = 'week' | 'month';
 
 export function Trends() {
   const { profile } = useAuth();
-  const [range, setRange] = useState<Range>('week');
-  const today = todayKey();
-
-  const { from, to } = useMemo(
-    () =>
-      range === 'week'
-        ? { from: startOfWeek(today), to: endOfWeek(today) }
-        : { from: startOfMonth(today), to: endOfMonth(today) },
-    [range, today],
-  );
-
-  const { days, loading } = useDayRange(from, to);
-
-  // The maintenance window is its own fixed look-back, independent of whichever
-  // range the user is viewing.
-  const window = useMemo(
-    () => ({ from: addDays(today, -(MAX_WINDOW_DAYS - 1)), to: today }),
-    [today],
-  );
-  const { days: windowDays } = useDayRange(window.from, window.to);
-  const maintenance = useMemo(
-    () => estimateMaintenance(windowDays ?? [], today),
-    [windowDays, today],
-  );
+  const [range, setRange] = useState<TrendRange>('week');
 
   if (!profile) return null;
-  const unit = weightUnitLabel(profile.units);
-  const target = profile.calorieTarget;
-
-  const summary = days
-    ? summarizeDays(days, { key: range, start: from, end: to, targetCalories: target })
-    : null;
-
-  // Only days up to today are plotted — a half-finished month should not look
-  // like a run of zero-calorie days.
-  const past = (days ?? []).filter((day) => day.date <= today);
-
-  const caloriePoints: CaloriePoint[] = past.map((day) => ({
-    label: range === 'week' ? weekdayLabel(day.date) : shortDateLabel(day.date),
-    calories: day.calories,
-    logged: day.calories > 0,
-  }));
-
-  // The smoothed line is what the user should actually read; the dots are just
-  // what the scale happened to say that morning.
-  const trendPoints = trendSeries(past);
-  const weightPoints: WeightPoint[] = past.map((day, index) => {
-    const show = (kg: number | null | undefined) =>
-      kg === null || kg === undefined ? null : Number(fromKg(kg, profile.units).toFixed(1));
-    return {
-      label: range === 'week' ? weekdayLabel(day.date) : shortDateLabel(day.date),
-      weight: show(day.weightKg),
-      trend: show(trendPoints[index]?.trendKg),
-    };
-  });
-  const weighIns = weightPoints.filter((point) => point.weight !== null).length;
-
-  const deficit = summary?.deficit ?? 0;
-
-  // Maintenance is measured once there is enough history and estimated from
-  // onboarding until then; PaceCard says which it is using.
-  const latestWeightKg = latestTrend(trendSeries(windowDays ?? [])) ?? undefined;
-  const basis = maintenanceBasis(maintenance, profile, latestWeightKg);
-  const pace = paceSummary({
-    days: days ?? [],
-    start: from,
-    // Never past today: a half-finished month must not read as missed days.
-    end: to < today ? to : today,
-    maintenanceCalories: basis.calories,
-    targetCalories: target,
-    goal: profile.goal,
-  });
 
   return (
     <Page title="Trends">
       <Choice
         value={range}
         onChange={setRange}
+        columns={3}
         options={[
-          { value: 'week', label: 'This week' },
-          { value: 'month', label: 'This month' },
+          { value: 'week', label: 'Week' },
+          { value: 'month', label: 'Month' },
+          { value: 'year', label: 'Year' },
         ]}
       />
 
-      <Card className="mt-4">
-        <div className="grid grid-cols-3 gap-3">
-          <Stat label="Days logged" value={loading ? '—' : String(summary?.daysLogged ?? 0)} />
-          <Stat
-            label="Avg intake"
-            value={loading ? '—' : `${(summary?.avgCalories ?? 0).toLocaleString()}`}
-          />
-          <Stat
-            label={deficit >= 0 ? 'Under target' : 'Over target'}
-            value={loading ? '—' : Math.abs(deficit).toLocaleString()}
-            tone={deficit >= 0 ? 'good' : 'warn'}
-          />
-        </div>
-        <p className="mt-3 text-xs text-slate-500">
-          Measured across the days you logged, so a day you missed never counts as a
-          day you fasted.
-        </p>
-      </Card>
-
-      {!loading && (
-        <div className="mt-4">
-          <PaceCard pace={pace} scope={range} source={basis.source} />
-        </div>
+      {/* Each view owns its own read, so switching to Year never costs the
+          week view a query it does not need. */}
+      {range === 'year' ? (
+        <YearView profile={profile} />
+      ) : (
+        <DayView range={range} profile={profile} />
       )}
-
-      <div className="mt-4">
-        <MaintenanceCard result={maintenance} latestWeightKg={latestWeightKg} />
-      </div>
-
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Intake vs target</h2>
-      <Card>
-        {loading ? (
-          <p className="py-12 text-center text-sm text-slate-400">Loading…</p>
-        ) : caloriePoints.length > 0 ? (
-          <CalorieChart data={caloriePoints} target={target} />
-        ) : (
-          <p className="py-12 text-center text-sm text-slate-500">Nothing logged yet.</p>
-        )}
-      </Card>
-
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Weight</h2>
-      <Card>
-        {loading ? (
-          <p className="py-12 text-center text-sm text-slate-400">Loading…</p>
-        ) : weighIns >= 2 ? (
-          <WeightChart data={weightPoints} unit={unit} showTrend />
-        ) : (
-          <p className="py-12 text-center text-sm text-slate-500">
-            Weigh in on two or more days to see your trend.
-          </p>
-        )}
-      </Card>
-
     </Page>
   );
+}
+
+/** Week and month: one bar per day, straight from the day logs. */
+function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }) {
+  const today = todayKey();
+
+  // One read serves both the chart and the maintenance window, so the week
+  // view reaches back further than it draws.
+  const span = Math.max(RANGE_DAYS[range], MAX_WINDOW_DAYS);
+  const from = useMemo(() => addDays(today, -(span - 1)), [today, span]);
+  const { days, loading } = useDayRange(from, today);
+
+  const { basis } = useMaintenanceBasis(days, profile);
+
+  const start = addDays(today, -(RANGE_DAYS[range] - 1));
+  const inRange = (days ?? []).filter((day) => day.date >= start);
+
+  const points = dailyDeficitPoints(
+    inRange,
+    basis.calories,
+    range === 'week' ? weekdayLabel : shortDateLabel,
+  );
+
+  const trend = trendSeries(inRange);
+  const weightPoints: WeightPoint[] = trend.map((point) => ({
+    label: range === 'week' ? weekdayLabel(point.date) : shortDateLabel(point.date),
+    weight: toDisplay(point.weightKg, profile),
+    trend: toDisplay(point.trendKg, profile),
+  }));
+
+  return (
+    <Body
+      loading={loading}
+      range={range}
+      profile={profile}
+      basis={basis}
+      points={points}
+      pace={paceFor(sumDays(inRange), basis, profile)}
+      weightPoints={weightPoints}
+      weightChangeKg={trendChangeKg(trend)}
+    />
+  );
+}
+
+/**
+ * Year: one bar per ISO week, read from the precomputed weekly roll-ups rather
+ * than 365 raw day logs — about 53 small documents for the same answer.
+ */
+function YearView({ profile }: { profile: UserProfile }) {
+  const today = todayKey();
+
+  const keys = useMemo(() => weekKeysFor(today, RANGE_DAYS.year), [today]);
+  const { weeks, loading } = useWeekSummaries(keys[0], toWeekKey(today));
+
+  // The maintenance estimate still needs day-level logs, and only ever looks
+  // back four weeks.
+  const windowFrom = useMemo(() => addDays(today, -(MAX_WINDOW_DAYS - 1)), [today]);
+  const { days } = useDayRange(windowFrom, today);
+  const { basis } = useMaintenanceBasis(days, profile);
+
+  const found = weeks ?? [];
+  const points = weeklyDeficitPoints(keys, found, basis.calories);
+
+  // A week's average weight is the right dot at this zoom.
+  const byKey = new Map(found.map((week) => [week.key, week]));
+  const trend = trendSeries(
+    keys.map((key) => ({
+      date: weekKeyToMonday(key),
+      weightKg: byKey.get(key)?.avgWeightKg ?? undefined,
+    })),
+  );
+  const weightPoints: WeightPoint[] = trend.map((point) => ({
+    label: shortDateLabel(point.date),
+    weight: toDisplay(point.weightKg, profile),
+    trend: toDisplay(point.trendKg, profile),
+  }));
+
+  return (
+    <Body
+      loading={loading}
+      range="year"
+      profile={profile}
+      basis={basis}
+      points={points}
+      pace={paceFor(sumWeeks(found), basis, profile)}
+      weightPoints={weightPoints}
+      weightChangeKg={trendChangeKg(trend)}
+      dense
+    />
+  );
+}
+
+function paceFor(
+  totals: { totalCalories: number; daysLogged: number },
+  basis: MaintenanceBasis,
+  profile: UserProfile,
+): PaceSummary {
+  return paceFromTotals({
+    ...totals,
+    maintenanceCalories: basis.calories,
+    targetCalories: profile.calorieTarget,
+    goal: profile.goal,
+  });
+}
+
+/** Kilograms to whatever the user picked, or null when there is no reading. */
+function toDisplay(kg: number | null | undefined, profile: UserProfile): number | null {
+  if (kg === null || kg === undefined) return null;
+  return Number(fromKg(kg, profile.units).toFixed(1));
+}
+
+function Body({
+  loading, range, profile, basis, points, pace, weightPoints, weightChangeKg, dense = false,
+}: {
+  loading: boolean;
+  range: TrendRange;
+  profile: UserProfile;
+  basis: MaintenanceBasis;
+  points: DeficitPoint[];
+  pace: PaceSummary;
+  weightPoints: WeightPoint[];
+  weightChangeKg: number | null;
+  dense?: boolean;
+}) {
+  if (loading) {
+    return (
+      <Card className="mt-4">
+        <p className="py-16 text-center text-sm text-slate-400">Loading…</p>
+      </Card>
+    );
+  }
+
+  // Nothing logged at all: one friendly line beats a graph full of zeros.
+  if (pace.daysLogged === 0) {
+    return (
+      <Card className="mt-4">
+        <p className="py-12 text-center text-sm text-slate-600">
+          Log a few days to see your trend.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Card className="mt-4">
+        <DeficitChart data={points} goalDeficit={pace.targetPerDay} dense={dense} />
+      </Card>
+
+      <div className="mt-4">
+        <DeficitSummaryCard pace={pace} basis={basis} range={range} sex={profile.sex} />
+      </div>
+
+      <Card className="mt-4">
+        <p className="text-sm font-medium text-slate-700">
+          {weightLine(weightChangeKg, range, profile)}
+        </p>
+        {weightChangeKg !== null && (
+          <div className="mt-3">
+            <WeightChart data={weightPoints} unit={weightUnitLabel(profile.units)} showTrend />
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+function weightLine(
+  changeKg: number | null,
+  range: TrendRange,
+  profile: UserProfile,
+): string {
+  if (changeKg === null) return 'Weigh in on two or more days to see your trend.';
+
+  const when = RANGE_LABELS[range];
+  // Under a twentieth of a kilo reads as nothing moved, which is its own result.
+  if (Math.abs(changeKg) < 0.05) return `Holding steady over ${when}.`;
+
+  const amount = formatWeight(Math.abs(changeKg), profile.units);
+  return changeKg < 0 ? `Down ${amount} over ${when}.` : `Up ${amount} over ${when}.`;
 }

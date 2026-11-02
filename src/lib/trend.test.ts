@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   smoothSeries, trendSeries, latestTrend, firstTrend, weighInSpan, countWeighIns,
+  trendChangeKg,
   DEFAULT_ALPHA,
 } from './trend';
 
@@ -115,5 +116,32 @@ describe('trend readers', () => {
 
   it('counts weigh-ins, not days', () => {
     expect(countWeighIns(points)).toBe(2);
+  });
+});
+
+describe('trendChangeKg', () => {
+  it('is negative when weight comes off', () => {
+    const change = trendChangeKg(trendSeries([
+      { date: '2026-03-02', weightKg: 85 },
+      { date: '2026-03-09', weightKg: 84 },
+    ]));
+    expect(change).not.toBeNull();
+    expect(change as number).toBeLessThan(0);
+  });
+
+  it('is positive when weight goes on', () => {
+    const change = trendChangeKg(trendSeries([
+      { date: '2026-03-02', weightKg: 84 },
+      { date: '2026-03-09', weightKg: 85 },
+    ]));
+    expect(change as number).toBeGreaterThan(0);
+  });
+
+  it('says nothing from a single weigh-in', () => {
+    expect(trendChangeKg(trendSeries([{ date: '2026-03-02', weightKg: 85 }]))).toBeNull();
+  });
+
+  it('says nothing when the scale was never used', () => {
+    expect(trendChangeKg(trendSeries([{ date: '2026-03-02' }]))).toBeNull();
   });
 });

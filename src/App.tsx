@@ -8,6 +8,7 @@ import { Today } from './pages/Today';
 import { More } from './pages/More';
 import { Rules } from './pages/Rules';
 import { Account } from './pages/Account';
+import { Maintenance } from './pages/Maintenance';
 import { Privacy, Terms } from './pages/Legal';
 import { Lift } from './pages/Lift';
 import { Spinner } from './components/ui';
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/photos" element={<Photos />} />
           <Route path="/more" element={<More />} />
           <Route path="/rules" element={<Rules />} />
+          <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/account" element={<Account />} />
           <Route path="/groups" element={<Groups />} />
           <Route path="/groups/:groupId" element={<GroupDetail />} />

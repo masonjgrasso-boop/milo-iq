@@ -32,6 +32,18 @@ export function More() {
       </Card>
 
       <Card className="mt-4">
+        <Link to="/maintenance" className="flex items-center justify-between">
+          <span>
+            <span className="block text-sm font-semibold text-slate-900">Maintenance</span>
+            <span className="block text-xs text-slate-500">
+              What your body actually burns, measured from your own logs
+            </span>
+          </span>
+          <span aria-hidden="true" className="text-slate-400">&rarr;</span>
+        </Link>
+      </Card>
+
+      <Card className="mt-3">
         <Link to="/rules" className="flex items-center justify-between">
           <span>
             <span className="block text-sm font-semibold text-slate-900">Rules</span>

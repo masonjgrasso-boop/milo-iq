@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { maintenanceBasis, paceSummary, MIN_WORTH_CHASING } from './pace';
+import { maintenanceBasis, paceFromTotals, paceSummary, MIN_WORTH_CHASING } from './pace';
 import { planCatchUpForUser } from './catchup';
 import { SAFE_MIN_CALORIES } from './targets';
 import type { MaintenanceResult } from './maintenance';
@@ -265,5 +265,38 @@ describe('the gap feeding the catch-up plan', () => {
     // A negative gap must never be read as something to make up.
     expect(planCatchUpForUser(summary.gapTotal, summary.targetCalories, 'male').needed)
       .toBe(false);
+  });
+});
+
+describe('paceFromTotals', () => {
+  it('agrees with paceSummary on the same logged days', () => {
+    const fromDays = paceSummary({
+      days: days([2000, 2100, 2200, 2150, 2150, null, null]),
+      ...window,
+      maintenanceCalories: 2500,
+      targetCalories: 2000,
+      goal: 'lose',
+    });
+
+    const fromTotals = paceFromTotals({
+      totalCalories: 10_600,
+      daysLogged: 5,
+      maintenanceCalories: 2500,
+      targetCalories: 2000,
+      goal: 'lose',
+    });
+
+    expect(fromTotals).toEqual(fromDays);
+  });
+
+  it('reports no data from empty totals', () => {
+    const summary = paceFromTotals({
+      totalCalories: 0,
+      daysLogged: 0,
+      maintenanceCalories: 2500,
+      targetCalories: 2000,
+      goal: 'lose',
+    });
+    expect(summary.status).toBe('no-data');
   });
 });

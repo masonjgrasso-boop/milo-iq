@@ -5,13 +5,15 @@
 // correlations that are not in the data.
 //
 // Colours are validated for colour-vision deficiency and for contrast against
-// the card surface. Over-target days also sit above the target line, so the
+// the card surface. Bars also sit on opposite sides of the zero line, so the
 // distinction never rests on colour alone.
 
+import type { ReactNode } from 'react';
 import {
-  Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine,
+  Bar, CartesianGrid, Cell, ComposedChart, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
+import type { DeficitPoint } from '../lib/deficit';
 
 export const CHART_COLORS = {
   onTarget: '#059669',
@@ -19,6 +21,9 @@ export const CHART_COLORS = {
   reference: '#94a3b8',
   grid: '#e2e8f0',
   axis: '#94a3b8',
+  // Validated against both bar colours and the card surface for colour-vision
+  // deficiency and for contrast; it is also a line rather than a bar.
+  average: '#2563eb',
 };
 
 const axisProps = {
@@ -38,42 +43,114 @@ const tooltipProps = {
   cursor: { fill: 'rgb(15 23 42 / 0.04)' },
 };
 
-export interface CaloriePoint {
-  label: string;
-  calories: number;
-  /** Days with nothing logged are drawn as a gap, not as a zero-calorie day. */
-  logged: boolean;
-}
-
-export function CalorieChart({ data, target }: { data: CaloriePoint[]; target: number }) {
+/**
+ * The deficit against maintenance, period by period.
+ *
+ * Zero is maintenance, so the sign of a bar is its meaning: above the line is
+ * a day that moved the scale, below it a day that did not. That position does
+ * the work colour alone should never do.
+ *
+ * Three marks on one axis, because all three are calories per day: the bars,
+ * a flat line for the deficit the goal asks for, and the running average.
+ */
+export function DeficitChart({ data, goalDeficit, dense = false }: {
+  data: DeficitPoint[];
+  goalDeficit: number;
+  /** Month and year views have too many bars to label every one. */
+  dense?: boolean;
+}) {
   return (
-    <ResponsiveContainer width="100%" height={180}>
-      <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -16 }} barCategoryGap="22%">
-        <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-        <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" />
-        <YAxis {...axisProps} width={44} />
-        <Tooltip
-          {...tooltipProps}
-          formatter={(value) => [`${Number(value).toLocaleString()} cal`, 'Eaten']}
-        />
-        <ReferenceLine
-          y={target}
-          stroke={CHART_COLORS.reference}
-          strokeDasharray="4 4"
-          label={{ value: 'Target', position: 'right', fontSize: 10, fill: '#64748b' }}
-        />
-        <Bar dataKey="calories" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-          {data.map((point, index) => (
-            <Cell
-              key={index}
-              fill={point.calories > target ? CHART_COLORS.overTarget : CHART_COLORS.onTarget}
-            />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <>
+      <ResponsiveContainer width="100%" height={200}>
+        <ComposedChart
+          data={data}
+          margin={{ top: 8, right: 4, bottom: 0, left: -12 }}
+          barCategoryGap={dense ? '10%' : '22%'}
+        >
+          <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+          <XAxis
+            dataKey="label"
+            {...axisProps}
+            interval={dense ? 'preserveStartEnd' : 0}
+            minTickGap={dense ? 24 : 4}
+          />
+          <YAxis {...axisProps} width={48} />
+          <Tooltip
+            {...tooltipProps}
+            formatter={(value, name) => [
+              `${Math.abs(Number(value)).toLocaleString()} cal`,
+              name === 'runningAvg'
+                ? 'Average so far'
+                : Number(value) >= 0
+                  ? 'Below maintenance'
+                  : 'Above maintenance',
+            ]}
+          />
+          {/* Maintenance itself. Crossing it is the only thing that matters. */}
+          <ReferenceLine y={0} stroke={CHART_COLORS.axis} />
+          <ReferenceLine
+            y={goalDeficit}
+            stroke={CHART_COLORS.reference}
+            strokeDasharray="4 4"
+            ifOverflow="extendDomain"
+          />
+          <Bar dataKey="deficit" radius={2} isAnimationActive={false}>
+            {data.map((point, index) => (
+              <Cell
+                key={index}
+                fill={
+                  (point.deficit ?? 0) >= 0 ? CHART_COLORS.onTarget : CHART_COLORS.overTarget
+                }
+              />
+            ))}
+          </Bar>
+          <Line
+            type="monotone"
+            dataKey="runningAvg"
+            stroke={CHART_COLORS.average}
+            strokeWidth={2}
+            dot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+
+      {/* Three marks need naming, and a ReferenceLine cannot appear in a
+          Recharts legend, so the key is written by hand. */}
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+        <Key color={CHART_COLORS.onTarget}>Daily deficit</Key>
+        <Key color={CHART_COLORS.average} line>Average so far</Key>
+        <Key color={CHART_COLORS.reference} line dashed>
+          Goal ({goalDeficit.toLocaleString()} cal)
+        </Key>
+      </ul>
+    </>
   );
 }
+
+function Key({ color, line = false, dashed = false, children }: {
+  color: string;
+  line?: boolean;
+  dashed?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <li className="flex items-center gap-1.5">
+      <span
+        aria-hidden="true"
+        className={line ? 'h-0.5 w-4 rounded-full' : 'h-2.5 w-2.5 rounded-sm'}
+        style={
+          dashed
+            ? { backgroundImage: `repeating-linear-gradient(to right, ${color} 0 4px, transparent 4px 7px)`, height: 2, width: 16 }
+            : { backgroundColor: color }
+        }
+      />
+      {children}
+    </li>
+  );
+}
+
 
 export interface WeightPoint {
   label: string;

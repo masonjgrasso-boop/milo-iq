@@ -82,3 +82,15 @@ export function weighInSpan(points: TrendPoint[]): number {
 
 export const countWeighIns = (points: TrendPoint[]): number =>
   points.filter((point) => point.weightKg !== null).length;
+
+/**
+ * How much the trend moved across a run of points, or null when there is not
+ * enough to say. Negative means weight came off.
+ */
+export function trendChangeKg(points: TrendPoint[]): number | null {
+  if (countWeighIns(points) < 2) return null;
+  const first = firstTrend(points);
+  const last = latestTrend(points);
+  if (first === null || last === null) return null;
+  return last - first;
+}

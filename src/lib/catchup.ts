@@ -118,3 +118,33 @@ export function planCatchUpForUser(
     safeMinimum: SAFE_MIN_CALORIES[sex],
   });
 }
+
+/** The horizon the Trends screen offers to get back on pace over. */
+export const RECOVERY_DAYS = 30;
+/** Widened to at most this when a 30-day cut would breach the safe floor. */
+export const MAX_RECOVERY_DAYS = 90;
+
+/**
+ * Getting back on pace over the next month.
+ *
+ * Only ever chases a month's worth of the shortfall, however long the period
+ * being viewed. A year's accumulated gap is history, not a debt — prescribing
+ * a cut big enough to repay it would be both impossible and exactly the
+ * "you blew it" message this app exists to avoid. Capping at the per-day gap
+ * times thirty also makes the suggestion land near the per-day gap itself,
+ * which is what "get back on track" means to a reader.
+ */
+export function planRecovery(
+  gapPerDay: number,
+  gapTotal: number,
+  dailyTarget: number,
+  sex: Sex,
+): CatchUpPlan {
+  return planCatchUp({
+    surplusCalories: Math.min(gapTotal, gapPerDay * RECOVERY_DAYS),
+    dailyTarget,
+    safeMinimum: SAFE_MIN_CALORIES[sex],
+    minDays: RECOVERY_DAYS,
+    maxDays: MAX_RECOVERY_DAYS,
+  });
+}

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  planCatchUp, planCatchUpForUser, surplusFrom, MIN_SPREAD_DAYS, MAX_SPREAD_DAYS,
+  planCatchUp, planCatchUpForUser, planRecovery, surplusFrom,
+  MIN_SPREAD_DAYS, MAX_SPREAD_DAYS, RECOVERY_DAYS, MAX_RECOVERY_DAYS,
 } from './catchup';
 import { SAFE_MIN_CALORIES } from './targets';
 import type { DayLog } from './types';
@@ -109,5 +110,51 @@ describe('planCatchUpForUser', () => {
 
     const male = planCatchUpForUser(6000, 2000, 'male');
     expect(male.adjustedTarget).toBeGreaterThanOrEqual(SAFE_MIN_CALORIES.male);
+  });
+});
+
+describe('planRecovery', () => {
+  // Target 2,000 against a 1,500 floor, so at most 500 a day can come off.
+  const target = 2000;
+
+  it('spreads a modest shortfall across exactly thirty days', () => {
+    const plan = planRecovery(120, 840, target, 'male');
+    expect(plan.needed).toBe(true);
+    expect(plan.days).toBe(RECOVERY_DAYS);
+    expect(plan.dailyAdjustment).toBe(28);
+    expect(plan.fullyCovered).toBe(true);
+  });
+
+  it('chases at most a month of the shortfall, however long the period', () => {
+    // A year behind by 120 a day is 43,800 calories; only 3,600 is chased.
+    const year = planRecovery(120, 43_800, target, 'male');
+    const month = planRecovery(120, 3600, target, 'male');
+    expect(year.surplusCalories).toBe(3600);
+    expect(year.dailyAdjustment).toBe(month.dailyAdjustment);
+  });
+
+  it('widens past thirty days rather than cutting below the safe floor', () => {
+    const plan = planRecovery(1000, 30_000, target, 'male');
+    expect(plan.days).toBeGreaterThan(RECOVERY_DAYS);
+    expect(plan.days).toBeLessThanOrEqual(MAX_RECOVERY_DAYS);
+    expect(plan.adjustedTarget).toBeGreaterThanOrEqual(SAFE_MIN_CALORIES.male);
+  });
+
+  it('lets the rest go when even the widest spread cannot cover it', () => {
+    const plan = planRecovery(2000, 60_000, target, 'male');
+    expect(plan.days).toBe(MAX_RECOVERY_DAYS);
+    expect(plan.adjustedTarget).toBe(SAFE_MIN_CALORIES.male);
+    expect(plan.fullyCovered).toBe(false);
+    expect(plan.shortfallCalories).toBeGreaterThan(0);
+  });
+
+  it('never suggests eating less when there is no shortfall', () => {
+    expect(planRecovery(-120, -840, target, 'male').needed).toBe(false);
+    expect(planRecovery(0, 0, target, 'male').needed).toBe(false);
+  });
+
+  it('respects the lower floor for women', () => {
+    const plan = planRecovery(1000, 30_000, 1300, 'female');
+    expect(plan.adjustedTarget).toBeGreaterThanOrEqual(SAFE_MIN_CALORIES.female);
   });
 });

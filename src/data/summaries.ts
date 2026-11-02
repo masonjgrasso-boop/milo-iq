@@ -3,7 +3,9 @@
 // These are written whenever a day changes, so reading a dashboard costs one
 // small document instead of a month of raw logs.
 
-import { collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import {
+  collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, where,
+} from 'firebase/firestore';
 import { getDb } from '../lib/firebase';
 import {
   endOfMonth, endOfWeek, startOfMonth, startOfWeek, toMonthKey, toWeekKey, type DayKey,
@@ -62,4 +64,27 @@ export async function refreshSummaries(
   ]);
 
   return { week, month };
+}
+
+/**
+ * Every stored week roll-up in a key range, oldest first.
+ *
+ * The year view reads these instead of 365 raw day logs: about 53 documents
+ * for the same answer. Week keys sort lexicographically, so a range on the key
+ * works the same way `listDays` ranges on the date.
+ */
+export async function listWeekSummaries(
+  uid: string,
+  fromWeek: string,
+  toWeek: string,
+): Promise<PeriodSummary[]> {
+  const snap = await getDocs(
+    query(
+      weeksCollection(uid),
+      where('key', '>=', fromWeek),
+      where('key', '<=', toWeek),
+      orderBy('key'),
+    ),
+  );
+  return snap.docs.map((document) => document.data() as PeriodSummary);
 }

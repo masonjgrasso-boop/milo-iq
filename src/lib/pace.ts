@@ -112,20 +112,25 @@ export interface PaceSummary {
   worthChasing: boolean;
 }
 
-export function paceSummary(input: PaceInput): PaceSummary {
-  const { days, start, end, maintenanceCalories, targetCalories, goal } = input;
+export interface PaceTotals {
+  /** Calories eaten across the logged buckets only. */
+  totalCalories: number;
+  daysLogged: number;
+  maintenanceCalories: number;
+  targetCalories: number;
+  goal: Goal;
+}
 
-  // Logged days only. This is the rule the whole app rests on: a day you
-  // forgot to log must never be counted as a day you ate nothing.
-  const logged = days.filter(
-    (day) => day.date >= start && day.date <= end && day.calories > 0,
-  );
+/**
+ * The three numbers from totals alone.
+ *
+ * Split out from `paceSummary` because the year view works from precomputed
+ * weekly roll-ups rather than raw day logs, and both need the same arithmetic.
+ */
+export function paceFromTotals(input: PaceTotals): PaceSummary {
+  const { totalCalories, daysLogged, maintenanceCalories, targetCalories, goal } = input;
 
-  const daysLogged = logged.length;
-  const avgIntake =
-    daysLogged === 0
-      ? 0
-      : Math.round(logged.reduce((sum, day) => sum + day.calories, 0) / daysLogged);
+  const avgIntake = daysLogged === 0 ? 0 : Math.round(totalCalories / daysLogged);
 
   const targetPerDay = Math.round(maintenanceCalories - targetCalories);
   const actualPerDay = daysLogged === 0 ? 0 : Math.round(maintenanceCalories - avgIntake);
@@ -165,4 +170,22 @@ export function paceSummary(input: PaceInput): PaceSummary {
     // direction — being ahead is good news, not something to correct.
     worthChasing: base.gapTotal >= MIN_WORTH_CHASING,
   };
+}
+
+export function paceSummary(input: PaceInput): PaceSummary {
+  const { days, start, end, maintenanceCalories, targetCalories, goal } = input;
+
+  // Logged days only. This is the rule the whole app rests on: a day you
+  // forgot to log must never be counted as a day you ate nothing.
+  const logged = days.filter(
+    (day) => day.date >= start && day.date <= end && day.calories > 0,
+  );
+
+  return paceFromTotals({
+    totalCalories: logged.reduce((sum, day) => sum + day.calories, 0),
+    daysLogged: logged.length,
+    maintenanceCalories,
+    targetCalories,
+    goal,
+  });
 }

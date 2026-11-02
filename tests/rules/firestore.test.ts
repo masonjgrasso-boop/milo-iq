@@ -101,6 +101,16 @@ describe('a user and their own data', () => {
     await assertFails(getDoc(doc(asAnon(), 'users', ALICE)));
     await assertFails(setDoc(doc(asAnon(), 'users', ALICE), { units: 'metric' }));
   });
+
+  // The year view lists these rather than reading 365 day logs.
+  it('can list its own weekly summaries', async () => {
+    await assertSucceeds(getDocs(query(collection(asBob(), 'users', BOB, 'weeks'))));
+  });
+
+  it('cannot list another user’s weekly summaries', async () => {
+    await assertFails(getDocs(query(collection(asAlice(), 'users', BOB, 'weeks'))));
+    await assertFails(getDocs(query(collection(asAnon(), 'users', BOB, 'weeks'))));
+  });
 });
 
 describe('group documents', () => {
