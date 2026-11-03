@@ -10,7 +10,8 @@ import { Rules } from './pages/Rules';
 import { Account } from './pages/Account';
 import { Maintenance } from './pages/Maintenance';
 import { Privacy, Terms } from './pages/Legal';
-import { Lift } from './pages/Lift';
+import { Workouts } from './pages/Workouts';
+
 import { Spinner } from './components/ui';
 
 // Charts are a large dependency and most visits only log food, so the chart
@@ -21,6 +22,13 @@ const GroupDetail = lazy(() =>
   import('./pages/GroupDetail').then((m) => ({ default: m.GroupDetail })),
 );
 const Photos = lazy(() => import('./pages/Photos').then((m) => ({ default: m.Photos })));
+const Exercises = lazy(() => import('./pages/Exercises').then((m) => ({ default: m.Exercises })));
+const RoutineEditor = lazy(() =>
+  import('./pages/RoutineEditor').then((m) => ({ default: m.RoutineEditor })),
+);
+const WorkoutRunner = lazy(() =>
+  import('./pages/WorkoutRunner').then((m) => ({ default: m.WorkoutRunner })),
+);
 const ExerciseDetail = lazy(() =>
   import('./pages/ExerciseDetail').then((m) => ({ default: m.ExerciseDetail })),
 );
@@ -54,8 +62,11 @@ export default function App() {
         <Route element={<RequireProfile />}>
           <Route path="/" element={<Today />} />
           <Route path="/trends" element={<Trends />} />
-          <Route path="/lift" element={<Lift />} />
-          <Route path="/lift/:exerciseId" element={<ExerciseDetail />} />
+          <Route path="/lift" element={<Workouts />} />
+          <Route path="/lift/exercises" element={<Exercises />} />
+          <Route path="/lift/day/:routineId" element={<RoutineEditor />} />
+          <Route path="/lift/do/:routineId" element={<WorkoutRunner />} />
+          <Route path="/lift/exercise/:exerciseId" element={<ExerciseDetail />} />
           <Route path="/photos" element={<Photos />} />
           <Route path="/more" element={<More />} />
           <Route path="/rules" element={<Rules />} />

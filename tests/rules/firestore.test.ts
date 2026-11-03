@@ -111,6 +111,18 @@ describe('a user and their own data', () => {
     await assertFails(getDocs(query(collection(asAlice(), 'users', BOB, 'weeks'))));
     await assertFails(getDocs(query(collection(asAnon(), 'users', BOB, 'weeks'))));
   });
+
+  // Routine days: the plan, which is as private as the logs.
+  it('can list its own routine days', async () => {
+    await assertSucceeds(getDocs(query(collection(asBob(), 'users', BOB, 'routines'))));
+  });
+
+  it('cannot read or write another user’s routine days', async () => {
+    await assertFails(getDocs(query(collection(asAlice(), 'users', BOB, 'routines'))));
+    await assertFails(
+      setDoc(doc(asAlice(), 'users', BOB, 'routines', 'day1'), { name: 'Legs' }),
+    );
+  });
 });
 
 describe('group documents', () => {

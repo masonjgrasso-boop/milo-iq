@@ -9,7 +9,7 @@ import type { Exercise } from '../lib/types';
 import { Button, Card, Field } from '../components/ui';
 import { Page } from '../components/Layout';
 
-export function Lift() {
+export function Exercises() {
   const { user, profile } = useAuth();
   const notify = useToast();
   const [exercises, setExercises] = useState<Exercise[] | null>(null);
@@ -60,7 +60,14 @@ export function Lift() {
   }
 
   return (
-    <Page title="Lift" subtitle="More weight or more reps — both count as progress.">
+    <Page title="All exercises" subtitle="More weight or more reps — both count as progress.">
+      <Link
+        to="/lift"
+        className="mb-4 inline-block text-sm font-medium text-slate-500 hover:text-slate-700"
+      >
+        &larr; Workouts
+      </Link>
+
       <input
         value={search}
         onChange={(event) => setSearch(event.target.value)}
@@ -140,7 +147,7 @@ function ExerciseRow({ exercise, unit, profileUnits }: {
 }) {
   return (
     <Link
-      to={`/lift/${exercise.id}`}
+      to={`/lift/exercise/${exercise.id}`}
       className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200
         bg-white px-4 py-3 shadow-sm transition hover:border-brand-400"
     >

@@ -36,7 +36,7 @@ const TABS: Tab[] = [
   },
   {
     to: '/lift',
-    label: 'Lift',
+    label: 'Workouts',
     icon: (
       <path
         d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12"

@@ -121,7 +121,7 @@ export function ExerciseDetail() {
       <Page title="Not found">
         <Card>
           <p className="text-sm text-slate-600">That exercise no longer exists.</p>
-          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-brand-600">
+          <Link to="/lift/exercises" className="mt-3 inline-block text-sm font-semibold text-brand-600">
             Back to exercises
           </Link>
         </Card>
@@ -134,7 +134,7 @@ export function ExerciseDetail() {
   return (
     <Page title={exercise.name}>
       <Link
-        to="/lift"
+        to="/lift/exercises"
         className="mb-4 inline-block text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         &larr; All exercises

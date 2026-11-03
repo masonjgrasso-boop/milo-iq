@@ -130,3 +130,38 @@ export interface WorkoutSession {
   bestE1rmKg: number;
   updatedAt?: unknown;
 }
+
+/**
+ * One exercise slot in a routine day.
+ *
+ * The name is denormalised so a routine renders without reading every
+ * exercise document; the id is what history hangs off, so renaming or
+ * reordering a routine never touches past sessions.
+ */
+export interface RoutineExercise {
+  exerciseId: string;
+  name: string;
+  /** Planned sets. */
+  sets: number;
+  /** Planned reps per set, shown as a hint rather than prefilled. */
+  plannedReps: number;
+}
+
+/**
+ * A workout day you set up once and reuse, such as "Day 1: Legs".
+ *
+ * The exercise list lives inside the document as an array, so the Workouts
+ * tab is one query of a handful of small documents and reordering is one
+ * write.
+ */
+export interface Routine {
+  id: string;
+  name: string;
+  /** Position in the week's rotation. */
+  order: number;
+  exercises: RoutineExercise[];
+  /** Last day this routine was worked, used to pick the next one due. */
+  lastDoneDate?: DayKey;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
