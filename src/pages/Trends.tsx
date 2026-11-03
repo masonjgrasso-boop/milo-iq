@@ -198,51 +198,53 @@ function Body({
     );
   }
 
-  // Nothing logged at all: one friendly line beats a graph full of zeros.
-  if (pace.daysLogged === 0) {
-    return (
-      <Card className="mt-4">
-        <p className="py-12 text-center text-sm text-slate-600">
-          Log a few days to see your trend.
-        </p>
-      </Card>
-    );
-  }
-
   return (
     <>
-      <Card className="mt-4">
-        <DeficitChart
-          data={points}
-          goalDeficit={pace.targetPerDay}
-          ticks={ticks}
-          dense={dense}
-        />
-      </Card>
-
+      {/* Maintenance leads: it is the number every other figure here is
+          measured against, so it belongs above them and kept to one strip. */}
       <div className="mt-4">
         <MaintenanceBox result={result} basis={basis} profile={profile} />
       </div>
 
-      <Card className="mt-4">
-        <p className="text-sm font-medium text-slate-700">
-          {weightLine(weightChangeKg, range, profile)}
-        </p>
-        {weightChangeKg !== null && (
-          <div className="mt-3">
-            <WeightChart
-              data={weightPoints}
-              unit={weightUnitLabel(profile.units)}
-              ticks={ticks}
-              showTrend
-            />
-          </div>
-        )}
-      </Card>
+      {/* Nothing logged at all: one friendly line beats a graph full of zeros. */}
+      {pace.daysLogged === 0 ? (
+        <Card className="mt-4">
+          <p className="py-12 text-center text-sm text-slate-600">
+            Log a few days to see your trend.
+          </p>
+        </Card>
+      ) : (
+        <>
+          <Card className="mt-4">
+            <p className="text-sm font-medium text-slate-700">
+              {weightLine(weightChangeKg, range, profile)}
+            </p>
+            {weightChangeKg !== null && (
+              <div className="mt-3">
+                <WeightChart
+                  data={weightPoints}
+                  unit={weightUnitLabel(profile.units)}
+                  ticks={ticks}
+                  showTrend
+                />
+              </div>
+            )}
+          </Card>
 
-      <div className="mt-4">
-        <DeficitSummaryCard pace={pace} range={range} sex={profile.sex} />
-      </div>
+          <Card className="mt-4">
+            <DeficitChart
+              data={points}
+              goalDeficit={pace.targetPerDay}
+              ticks={ticks}
+              dense={dense}
+            />
+          </Card>
+
+          <div className="mt-4">
+            <DeficitSummaryCard pace={pace} range={range} sex={profile.sex} />
+          </div>
+        </>
+      )}
     </>
   );
 }
