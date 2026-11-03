@@ -4,12 +4,12 @@
 // exercise and every set is laid out before you start; you type the weight,
 // type the reps, and tap the tick.
 //
-// Weight is never prefilled. Lifters change the load every session, and a
-// prefilled figure nobody corrected quietly poisons the progress graph. Last
-// session's numbers are shown as a reference line instead, which is what you
-// actually want to beat.
+// Both boxes start empty and stay empty. Lifters change the load every
+// session, and a figure nobody corrected quietly poisons the progress graph.
+// Last session's numbers are shown as a reference line underneath instead,
+// which is what you actually want to beat.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
 import { useToast } from '../context/toast-context';
@@ -17,7 +17,7 @@ import { useExercises } from '../hooks/useExercises';
 import { getRoutine, markRoutineDone, saveRoutine } from '../data/routines';
 import { getSession, saveSession } from '../data/workouts';
 import { friendlyDayLabel, todayKey } from '../lib/dates';
-import { clampReps, DEFAULT_REPS, DEFAULT_SETS } from '../lib/routines';
+import { DEFAULT_SETS } from '../lib/routines';
 import { type WorkoutSet } from '../lib/strength';
 import { fromKg, toKg, weightUnitLabel } from '../lib/units';
 import { canLogSet, isNewBest, summarizeWorkout, type WorkoutSummary } from '../lib/workout';
@@ -38,7 +38,6 @@ interface Row {
 interface Slot {
   exerciseId: string;
   name: string;
-  plannedReps: number;
   rows: Row[];
   /** Best estimated 1RM before this set, updated as sets land. */
   bestKg: number;
@@ -70,58 +69,75 @@ function Runner({ routineId, uid, profile }: {
   profile: UserProfile;
 }) {
   const notify = useToast();
-  const { exercises, addExercise } = useExercises();
+  const { exercises, addExercise, failed: libraryFailed } = useExercises();
   const date = todayKey();
   const unit = weightUnitLabel(profile.units);
 
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
-  // Laid out once. The exercise list changes identity whenever a custom
-  // exercise is added, and rebuilding the slots would wipe sets in progress.
-  const [laidOut, setLaidOut] = useState(false);
+  const [failed, setFailed] = useState(false);
+  /** Bumped by "try again", which is what makes the load effect run afresh. */
+  const [attempt, setAttempt] = useState(0);
   const [picking, setPicking] = useState<{ replacing?: string } | null>(null);
   const [summary, setSummary] = useState<WorkoutSummary | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [savingRoutine, setSavingRoutine] = useState(false);
 
-  // Exercises are needed for last-session figures, so the slots wait for them.
+  // The layout is built once.
+  //
+  // This is a ref rather than state on purpose. The exercise list changes
+  // identity whenever a custom exercise is added, so without a guard the slots
+  // would be rebuilt and sets in progress lost — but setting a *state* guard
+  // part-way through re-runs this effect, whose cleanup then cancels the very
+  // continuation that clears the spinner. A ref changes nothing on screen, so
+  // the load always finishes.
+  const laidOut = useRef(false);
+
   useEffect(() => {
-    if (!uid || !routineId || !exercises || laidOut) return;
+    if (!uid || !routineId || !exercises || laidOut.current) return;
+    laidOut.current = true;
     let cancelled = false;
 
     (async () => {
-      const found = await getRoutine(uid, routineId);
-      if (cancelled) return;
-      setLaidOut(true);
-      if (!found) {
-        setRoutine(null);
+      try {
+        const found = await getRoutine(uid, routineId);
+        if (cancelled) return;
+        if (!found) {
+          setRoutine(null);
+          setLoading(false);
+          return;
+        }
+
+        const byId = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+
+        // Anything already logged today is restored, so closing the app mid
+        // workout does not lose the sets that are done.
+        const existing = await Promise.all(
+          found.exercises.map((slot) => getSession(uid, slot.exerciseId, date)),
+        );
+        if (cancelled) return;
+
+        setRoutine(found);
+        setSlots(
+          found.exercises.map((slot, index) =>
+            toSlot(slot, byId.get(slot.exerciseId), existing[index]?.sets ?? [], profile),
+          ),
+        );
         setLoading(false);
-        return;
+      } catch {
+        if (cancelled) return;
+        // Never spin forever: say what happened and offer another go.
+        laidOut.current = false;
+        setFailed(true);
+        setLoading(false);
       }
-
-      const byId = new Map(exercises.map((exercise) => [exercise.id, exercise]));
-
-      // Anything already logged today is restored, so closing the app mid
-      // workout does not lose the sets that are done.
-      const existing = await Promise.all(
-        found.exercises.map((slot) => getSession(uid, slot.exerciseId, date)),
-      );
-      if (cancelled) return;
-
-      setRoutine(found);
-      setSlots(
-        found.exercises.map((slot, index) =>
-          toSlot(slot, byId.get(slot.exerciseId), existing[index]?.sets ?? [], profile),
-        ),
-      );
-      setLoading(false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [uid, routineId, exercises, laidOut, date, profile]);
+  }, [uid, routineId, exercises, date, profile, attempt]);
 
   const logged = useMemo(
     () => slots.reduce((sum, slot) => sum + slot.rows.filter((row) => row.logged).length, 0),
@@ -206,7 +222,6 @@ function Runner({ routineId, uid, profile }: {
       exerciseId: slot.exerciseId,
       name: slot.name,
       sets: slot.rows.length,
-      plannedReps: slot.plannedReps,
     }));
     try {
       await saveRoutine(uid, routine.id, { exercises: exercisesNow });
@@ -222,14 +237,7 @@ function Runner({ routineId, uid, profile }: {
 
   function addSlot(exercise: Exercise, replacing?: string) {
     const fresh = toSlot(
-      {
-        exerciseId: exercise.id,
-        name: exercise.name,
-        sets: DEFAULT_SETS,
-        plannedReps: replacing
-          ? slots.find((slot) => slot.exerciseId === replacing)?.plannedReps ?? DEFAULT_REPS
-          : DEFAULT_REPS,
-      },
+      { exerciseId: exercise.id, name: exercise.name, sets: DEFAULT_SETS },
       exercise,
       [],
       profile,
@@ -242,6 +250,33 @@ function Runner({ routineId, uid, profile }: {
         : [...current, fresh],
     );
     setPicking(null);
+  }
+
+  if (failed || libraryFailed) {
+    return (
+      <Page title="Could not load">
+        <Card className="border-red-200 bg-red-50">
+          <p className="text-sm text-red-800">
+            Your workout would not load. That is almost always the connection rather than
+            anything you did — nothing has been lost.
+          </p>
+          <div className="mt-3">
+            <Button
+              onClick={() => {
+                setFailed(false);
+                setLoading(true);
+                setAttempt((count) => count + 1);
+              }}
+            >
+              Try again
+            </Button>
+          </div>
+          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-red-800">
+            Back to workouts
+          </Link>
+        </Card>
+      </Page>
+    );
   }
 
   if (loading) {
@@ -387,7 +422,6 @@ function toSlot(
   return {
     exerciseId: planned.exerciseId,
     name: exercise?.name ?? planned.name,
-    plannedReps: clampReps(planned.plannedReps),
     rows: rows.length > 0 ? rows : blankRows(1),
     bestKg: exercise?.bestE1rmKg ?? 0,
     startingBestKg: exercise?.bestE1rmKg ?? 0,
@@ -472,7 +506,6 @@ function ExerciseCard({
               <NumberInput
                 value={row.reps}
                 min={1}
-                placeholder={String(slot.plannedReps)}
                 onChange={(event) => onEdit(index, { reps: event.target.value })}
                 aria-label={`${slot.name} set ${index + 1} reps`}
                 className={row.logged ? 'bg-slate-50 text-slate-500' : ''}

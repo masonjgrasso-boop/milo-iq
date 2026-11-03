@@ -39,8 +39,26 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if isOwner(uid);
 
+      // Everything under a user is theirs alone: days, weeks, months, foods,
+      // rules, exercises and their sessions, routines, photos.
       match /{document=**} {
         allow read, write: if isOwner(uid);
+      }
+
+      // The same grant, written out for the collections the workout feature
+      // uses. Redundant against the wildcard above by design: if that wildcard
+      // is ever narrowed, these must not silently stop working, and being
+      // named here is what lets the rule tests assert each path on purpose.
+      match /routines/{routineId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /exercises/{exerciseId} {
+        allow read, write: if isOwner(uid);
+
+        match /sessions/{date} {
+          allow read, write: if isOwner(uid);
+        }
       }
     }
 

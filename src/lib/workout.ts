@@ -1,12 +1,10 @@
 // Doing a workout: what counts as a logged set, and what to say at the end.
 //
-// Weight is never prefilled and never guessed. Lifters change the load every
-// session, and a prefilled number that nobody corrected is worse than no
-// number at all — it quietly poisons the progress graph. So a set cannot be
-// logged without a weight the user typed.
-//
-// Reps are different: the plan already says how many, so the planned figure
-// is shown as a hint and the user types what they actually managed.
+// Nothing is prefilled and nothing is guessed. Lifters change the load every
+// session, and a number nobody corrected is worse than no number at all — it
+// quietly poisons the progress graph. So both the weight and the reps have to
+// be typed before a set can be logged, and a routine never plans reps: the
+// only reps worth keeping are the ones actually done.
 
 import { bestSetE1rm, estimateOneRepMax, type WorkoutSet } from './strength';
 

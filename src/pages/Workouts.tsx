@@ -22,15 +22,21 @@ export function Workouts() {
   const navigate = useNavigate();
 
   const [routines, setRoutines] = useState<Routine[] | null>(null);
+  const [failed, setFailed] = useState(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    listRoutines(user.uid).then((found) => {
-      if (!cancelled) setRoutines(sortRoutines(found));
-    });
+    listRoutines(user.uid)
+      .then((found) => {
+        if (!cancelled) setRoutines(sortRoutines(found));
+      })
+      // Better a message than a spinner that never stops.
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -68,7 +74,14 @@ export function Workouts() {
 
   return (
     <Page title="Workouts" subtitle="Set a day up once, then just turn up and lift.">
-      {routines === null ? (
+      {failed ? (
+        <Card className="border-red-200 bg-red-50">
+          <p className="text-sm text-red-800">
+            Your workout days would not load — that is usually the connection. Nothing has
+            been lost; pull the page down to try again.
+          </p>
+        </Card>
+      ) : routines === null ? (
         <p className="mt-6 text-center text-sm text-slate-400">Loading…</p>
       ) : routines.length === 0 ? (
         <Card>

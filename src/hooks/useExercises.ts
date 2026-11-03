@@ -14,15 +14,25 @@ export function useExercises() {
   const uid = user?.uid;
 
   const [exercises, setExercises] = useState<Exercise[] | null>(null);
+  /** Set when the library could not be read, so callers can say so rather
+   *  than waiting on a list that is never coming. */
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
     let cancelled = false;
-    listExercises(uid).then(async (found) => {
-      // First visit: lay down the starter list so there is something to tap.
-      const list = found.length === 0 ? await seedStarterExercises(uid) : found;
-      if (!cancelled) setExercises([...list].sort(byName));
-    });
+
+    (async () => {
+      try {
+        const found = await listExercises(uid);
+        // First visit: lay down the starter list so there is something to tap.
+        const list = found.length === 0 ? await seedStarterExercises(uid) : found;
+        if (!cancelled) setExercises([...list].sort(byName));
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
@@ -39,5 +49,5 @@ export function useExercises() {
     [uid],
   );
 
-  return { exercises, setExercises, addExercise, loading: exercises === null };
+  return { exercises, setExercises, addExercise, failed, loading: exercises === null && !failed };
 }

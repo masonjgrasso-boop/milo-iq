@@ -141,10 +141,8 @@ export interface WorkoutSession {
 export interface RoutineExercise {
   exerciseId: string;
   name: string;
-  /** Planned sets. */
+  /** Planned sets. The weight and reps actually done are typed in the gym. */
   sets: number;
-  /** Planned reps per set, shown as a hint rather than prefilled. */
-  plannedReps: number;
 }
 
 /**

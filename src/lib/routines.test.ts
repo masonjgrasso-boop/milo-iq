@@ -1,15 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   moveItem, sortRoutines, nextDueRoutine, plannedSetCount, nextOrder, renumber,
-  clampSets, clampReps, MAX_SETS, MAX_REPS,
+  clampSets, MAX_SETS,
 } from './routines';
 import type { Routine, RoutineExercise } from './types';
 
-const slot = (name: string, sets = 3, plannedReps = 10): RoutineExercise => ({
+const slot = (name: string, sets = 3): RoutineExercise => ({
   exerciseId: name.toLowerCase(),
   name,
   sets,
-  plannedReps,
 });
 
 const routine = (
@@ -129,24 +128,20 @@ describe('ordering helpers', () => {
   });
 });
 
-describe('clamping typed sets and reps', () => {
+describe('clamping typed set counts', () => {
   it('never allows zero sets', () => {
     expect(clampSets(0)).toBe(1);
-    expect(clampReps(0)).toBe(1);
   });
 
   it('caps absurd input', () => {
     expect(clampSets(500)).toBe(MAX_SETS);
-    expect(clampReps(500)).toBe(MAX_REPS);
   });
 
   it('rounds a fractional entry', () => {
     expect(clampSets(3.6)).toBe(4);
-    expect(clampReps(8.2)).toBe(8);
   });
 
   it('falls back to one for nonsense', () => {
     expect(clampSets(Number.NaN)).toBe(1);
-    expect(clampReps(Number.NaN)).toBe(1);
   });
 });

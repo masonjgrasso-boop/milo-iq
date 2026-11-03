@@ -7,19 +7,20 @@
 
 import type { Routine, RoutineExercise } from './types';
 
-/** Default sets and reps for a newly added exercise — a common starting block. */
+/** Sets for a newly added exercise — a common starting block. */
 export const DEFAULT_SETS = 3;
-export const DEFAULT_REPS = 10;
 
-/** Sets and reps are typed by hand, so they need bounds. */
+/**
+ * Set counts are typed by hand, so they need a bound.
+ *
+ * Reps are deliberately not part of a routine. Planning them encourages
+ * logging the plan rather than the session, and the only reps worth keeping
+ * are the ones actually done — so they are typed in the gym, nowhere else.
+ */
 export const MAX_SETS = 12;
-export const MAX_REPS = 50;
 
 export const clampSets = (value: number): number =>
   Math.min(MAX_SETS, Math.max(1, Math.round(value) || 1));
-
-export const clampReps = (value: number): number =>
-  Math.min(MAX_REPS, Math.max(1, Math.round(value) || 1));
 
 /**
  * Moves one item to a new index, leaving everything else in order.

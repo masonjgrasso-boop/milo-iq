@@ -11,7 +11,7 @@ import { useToast } from '../context/toast-context';
 import { useExercises } from '../hooks/useExercises';
 import { deleteRoutine, getRoutine, saveRoutine } from '../data/routines';
 import {
-  clampReps, clampSets, DEFAULT_REPS, DEFAULT_SETS, moveItem, plannedSetCount,
+  clampSets, DEFAULT_SETS, moveItem, plannedSetCount,
 } from '../lib/routines';
 import type { Routine, RoutineExercise } from '../lib/types';
 import { Button, Card, NumberInput } from '../components/ui';
@@ -28,17 +28,25 @@ export function RoutineEditor() {
 
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [picking, setPicking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!user || !routineId) return;
     let cancelled = false;
-    getRoutine(user.uid, routineId).then((found) => {
-      if (cancelled) return;
-      setRoutine(found);
-      setLoading(false);
-    });
+    getRoutine(user.uid, routineId)
+      .then((found) => {
+        if (cancelled) return;
+        setRoutine(found);
+        setLoading(false);
+      })
+      // Better a message than a spinner that never stops.
+      .catch(() => {
+        if (cancelled) return;
+        setFailed(true);
+        setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -62,6 +70,22 @@ export function RoutineEditor() {
       <Page title="Loading…">
         <Card>
           <p className="text-sm text-slate-400">One moment…</p>
+        </Card>
+      </Page>
+    );
+  }
+
+  if (failed) {
+    return (
+      <Page title="Could not load">
+        <Card className="border-red-200 bg-red-50">
+          <p className="text-sm text-red-800">
+            That workout day would not load — usually the connection rather than anything
+            you did. Nothing has been lost.
+          </p>
+          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-red-800">
+            Back to workouts
+          </Link>
         </Card>
       </Page>
     );
@@ -172,12 +196,7 @@ export function RoutineEditor() {
               commit({
                 exercises: [
                   ...slots,
-                  {
-                    exerciseId: exercise.id,
-                    name: exercise.name,
-                    sets: DEFAULT_SETS,
-                    plannedReps: DEFAULT_REPS,
-                  },
+                  { exerciseId: exercise.id, name: exercise.name, sets: DEFAULT_SETS },
                 ],
               });
             }}
@@ -188,12 +207,7 @@ export function RoutineEditor() {
               commit({
                 exercises: [
                   ...slots,
-                  {
-                    exerciseId: created.id,
-                    name: created.name,
-                    sets: DEFAULT_SETS,
-                    plannedReps: DEFAULT_REPS,
-                  },
+                  { exerciseId: created.id, name: created.name, sets: DEFAULT_SETS },
                 ],
               });
             }}
@@ -281,27 +295,19 @@ function SlotRow({ slot, handle, dragging, onChange, onRemove }: {
         </button>
       </div>
 
-      <div className="mt-2 flex items-end gap-3 pl-8">
-        <label className="flex-1">
-          <span className="mb-1 block text-xs font-medium text-slate-500">Sets</span>
-          <NumberInput
-            value={String(slot.sets)}
-            min={1}
-            onChange={(event) => onChange({ sets: clampSets(Number(event.target.value)) })}
-            aria-label={`${slot.name} sets`}
-          />
-        </label>
-        <span className="pb-3 text-sm text-slate-400">&times;</span>
-        <label className="flex-1">
-          <span className="mb-1 block text-xs font-medium text-slate-500">Planned reps</span>
-          <NumberInput
-            value={String(slot.plannedReps)}
-            min={1}
-            onChange={(event) =>
-              onChange({ plannedReps: clampReps(Number(event.target.value)) })
-            }
-            aria-label={`${slot.name} planned reps`}
-          />
+      {/* Sets only. Reps are what you actually managed, so they are typed in
+          the gym rather than planned here. */}
+      <div className="mt-2 flex items-center gap-3 pl-8">
+        <label className="flex items-center gap-3">
+          <span className="text-xs font-medium text-slate-500">Sets</span>
+          <span className="w-20">
+            <NumberInput
+              value={String(slot.sets)}
+              min={1}
+              onChange={(event) => onChange({ sets: clampSets(Number(event.target.value)) })}
+              aria-label={`${slot.name} sets`}
+            />
+          </span>
         </label>
       </div>
     </div>

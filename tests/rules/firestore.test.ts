@@ -123,6 +123,31 @@ describe('a user and their own data', () => {
       setDoc(doc(asAlice(), 'users', BOB, 'routines', 'day1'), { name: 'Legs' }),
     );
   });
+
+  // Workout sessions, which hang beneath their exercise.
+  it('can read and write its own workout sessions', async () => {
+    await assertSucceeds(
+      setDoc(doc(asBob(), 'users', BOB, 'exercises', 'sq', 'sessions', '2026-11-02'), {
+        date: '2026-11-02',
+        sets: [{ weightKg: 100, reps: 8 }],
+        bestE1rmKg: 126.7,
+      }),
+    );
+    await assertSucceeds(
+      getDocs(query(collection(asBob(), 'users', BOB, 'exercises', 'sq', 'sessions'))),
+    );
+  });
+
+  it('cannot touch another user’s workout sessions', async () => {
+    await assertFails(
+      getDocs(query(collection(asAlice(), 'users', BOB, 'exercises', 'sq', 'sessions'))),
+    );
+    await assertFails(
+      setDoc(doc(asAlice(), 'users', BOB, 'exercises', 'sq', 'sessions', '2026-11-02'), {
+        sets: [],
+      }),
+    );
+  });
 });
 
 describe('group documents', () => {
