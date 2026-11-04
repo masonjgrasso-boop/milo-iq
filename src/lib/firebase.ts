@@ -2,7 +2,9 @@
 // setup screen instead of a stack trace when .env.local is missing.
 
 import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import { getAuth, type Auth } from 'firebase/auth';
+import { planAppCheck } from './appcheck';
 import {
   initializeFirestore,
   persistentLocalCache,
@@ -24,9 +26,54 @@ export const isFirebaseConfigured = Boolean(config.apiKey && config.projectId);
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
+let appCheckStarted = false;
+
+/**
+ * Start App Check, if a reCAPTCHA Enterprise site key is configured.
+ *
+ * This runs inside getApp, immediately after initializeApp and before any
+ * service can make a request. That ordering matters: the SDK attaches tokens
+ * to requests made after App Check is initialized, so starting it late would
+ * send the first few requests unattested - which reads as unverified traffic
+ * in monitoring mode and fails outright once enforcement is on.
+ *
+ * Any failure here is swallowed deliberately. A broken or missing site key
+ * must not take the whole app down; it degrades to unattested requests, which
+ * is visible in the App Check metrics and is the problem to fix there.
+ */
+function startAppCheck(instance: FirebaseApp): void {
+  if (appCheckStarted) return;
+  appCheckStarted = true;
+
+  const plan = planAppCheck({
+    siteKey: import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY,
+    hostname: window.location.hostname,
+  });
+  if (plan.mode === 'off') return;
+
+  if (plan.mode === 'debug') {
+    // Makes the SDK print a debug token to the console on first load. Register
+    // that token once under App Check > Apps > Manage debug tokens, and this
+    // machine keeps working after enforcement is turned on.
+    (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean | string })
+      .FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
+  }
+
+  try {
+    initializeAppCheck(instance, {
+      provider: new ReCaptchaEnterpriseProvider(plan.siteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (error) {
+    console.warn('App Check did not start; requests will be unattested.', error);
+  }
+}
 
 function getApp(): FirebaseApp {
-  if (!app) app = initializeApp(config);
+  if (!app) {
+    app = initializeApp(config);
+    startAppCheck(app);
+  }
   return app;
 }
 

@@ -156,6 +156,55 @@ firebase deploy --only hosting
 Firebase gives you a free `*.web.app` URL with HTTPS. On a phone, open it and use
 **Add to Home Screen** to install it as an app.
 
+### 10. Lock it down before sharing it
+
+The security rules are what actually protect your data, and they are already
+deployed. These two steps are the layer on top: they make it harder for someone
+to point a script at your project at all.
+
+**App Check** (attests that requests come from your app)
+
+1. Google Cloud Console > **Security** > **reCAPTCHA**. Create a key, type
+   **Website**. Add `milo-iq.web.app`, `milo-iq.firebaseapp.com` and
+   `localhost` (substitute your own domains). Leave "use checkbox challenge"
+   off — App Check uses the invisible score-based flow.
+2. Copy the **site key** into `.env.local` as
+   `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY`, then `npm run build && firebase deploy
+   --only hosting`. Until you do this the app sends no App Check tokens.
+3. Firebase Console > **App Check** > **Apps** > your web app > **reCAPTCHA
+   Enterprise**. Paste the same site key and save. This starts **monitoring
+   mode**: Firebase records whether requests are attested but allows all of
+   them through.
+4. Use the app for a day. Under App Check > **APIs**, each of Firestore,
+   Storage and Authentication shows a split of verified vs unverified
+   requests. Wait until **verified is close to 100%** of your own traffic.
+5. Only then, per API, click **Enforce**. Anything unattested is rejected from
+   that moment, so an early enforce locks you out of your own app.
+
+For local development the SDK prints a debug token to the browser console on
+first load. Register it under App Check > Apps > **Manage debug tokens** and
+`localhost` keeps working after enforcement. A debug token is a credential —
+do not commit it or paste it anywhere public.
+
+reCAPTCHA Enterprise has a monthly free allowance and bills per assessment
+beyond it, so keep a budget alert on the project.
+
+**Restrict the web API key** (stops the key being used from other sites)
+
+1. Google Cloud Console > **APIs & Services** > **Credentials** > the
+   **Browser key (auto created by Firebase)**.
+2. **Application restrictions** > **Websites**, and add:
+   `milo-iq.web.app/*`, `milo-iq.firebaseapp.com/*`, `localhost`,
+   `localhost:*/*`.
+3. Leave **API restrictions** unrestricted at first. If you do restrict them,
+   the app needs all of: Identity Toolkit, Token Service, Firebase
+   Installations, Cloud Firestore, Cloud Storage for Firebase, and reCAPTCHA
+   Enterprise. Removing any one of those breaks sign-in or saving.
+
+The API key in a web build is public by design — it identifies the project and
+authorises nothing. Restricting it is worth doing, but it is a speed bump, not
+a security boundary. The rules are the boundary.
+
 ---
 
 ## Scripts
@@ -232,8 +281,11 @@ Two deliberate choices worth knowing about:
 - Invite codes can be looked up but not listed, so they cannot be enumerated.
 - Members write only their own membership record, so nobody can add someone else to a
   group or alter another member's share settings.
-- 44 rule tests run against the real emulator and assert the denials, not just the
+- 56 rule tests run against the real emulator and assert the denials, not just the
   permissions.
+- App Check can attest that requests come from your app rather than a script, and the
+  web API key can be restricted to your own domains. Both are set up in step 10 and
+  neither replaces the rules.
 
 Found a security problem? Please open an issue describing the class of problem, without a
 working exploit.
