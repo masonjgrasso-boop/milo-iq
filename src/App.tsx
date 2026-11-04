@@ -53,6 +53,26 @@ function RequireProfile() {
   return <Layout />;
 }
 
+/**
+ * Privacy and terms are reachable either side of signing in, so they are the
+ * one pair of screens that needs to work both ways: inside the app shell with
+ * the nav when there is an app to go back to, and standalone otherwise.
+ */
+function LegalRoute({ page }: { page: 'privacy' | 'terms' }) {
+  const { user, profile, loading } = useAuth();
+  const Body = page === 'privacy' ? Privacy : Terms;
+
+  if (loading) return <Spinner />;
+  if (user && profile) {
+    return (
+      <Layout>
+        <Body />
+      </Layout>
+    );
+  }
+  return <Body />;
+}
+
 /** Sign-in is its own screen now, and pointless once you are signed in. */
 function SignInRoute() {
   const { user, loading } = useAuth();
@@ -73,8 +93,8 @@ export default function App() {
     <Suspense fallback={<Spinner />}>
       <Routes>
         <Route path="/signin" element={<SignInRoute />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<LegalRoute page="privacy" />} />
+        <Route path="/terms" element={<LegalRoute page="terms" />} />
         <Route path="/onboarding" element={<OnboardingRoute />} />
         <Route element={<RequireProfile />}>
           <Route path="/" element={<Today />} />

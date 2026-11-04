@@ -129,20 +129,14 @@ export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
           />
           {/* Maintenance itself. Crossing it is the only thing that matters. */}
           <ReferenceLine y={0} stroke={CHART_COLORS.zero} />
+          {/* No label on the line itself: a tall bar reaching the top of the
+              plot would sit underneath it. The number is in the key instead. */}
           <ReferenceLine
             y={goalDeficit}
             stroke={CHART_COLORS.reference}
             strokeDasharray="4 4"
             strokeWidth={2}
             ifOverflow="extendDomain"
-            label={{
-              value: `Goal ${goalDeficit.toLocaleString()}`,
-              position: 'insideTopRight',
-              fontSize: 10,
-              fontWeight: 700,
-              fill: '#5d665f',
-              dy: -6,
-            }}
           />
           <Bar dataKey="deficit" shape={<DeficitBar />} isAnimationActive={false} />
           <Line
@@ -166,7 +160,9 @@ export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
         <Key color={CHART_COLORS.under}>Under maintenance</Key>
         <Key color={CHART_COLORS.over}>Over</Key>
         <Key color={CHART_COLORS.average} line>Average so far</Key>
-        <Key color={CHART_COLORS.reference} line dashed>Goal</Key>
+        <Key color={CHART_COLORS.reference} line dashed>
+          Goal ({goalDeficit.toLocaleString()} cal)
+        </Key>
       </ul>
     </>
   );

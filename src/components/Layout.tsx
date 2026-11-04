@@ -60,7 +60,10 @@ function ReminderDot({ className }: { className: string }) {
   );
 }
 
-export function Layout() {
+export function Layout({ children }: {
+  /** A screen to wrap directly. Routes nested under Layout use the Outlet. */
+  children?: ReactNode;
+}) {
   // From 6pm, an unfinished checklist puts a dot on the Rules tab.
   const remind = useRuleReminder();
 
@@ -106,7 +109,7 @@ export function Layout() {
 
       {/* ---- The screen itself -------------------------------------------- */}
       <div className="pb-[84px] lg:pb-0 lg:pl-[248px]">
-        <Outlet />
+        {children ?? <Outlet />}
       </div>
 
       {/* ---- Bottom bar: phone and tablet --------------------------------- */}
@@ -116,16 +119,17 @@ export function Layout() {
           backdrop-blur lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <ul className="mx-auto grid max-w-md grid-cols-6 px-1.5 pt-2">
+        <ul className="mx-auto grid max-w-md grid-cols-6 px-0.5 pt-2 sm:px-1.5">
           {TABS.map((tab) => {
             const dot = tab.to === '/rules' && remind;
             return (
-              <li key={tab.to}>
+              <li key={tab.to} className="min-w-0">
                 <NavLink
                   to={tab.to}
                   end={tab.to === '/'}
                   className={({ isActive }) =>
-                    `flex h-[76px] flex-col items-center gap-1 pt-0.5 text-[11px] font-bold transition
+                    `flex h-[76px] flex-col items-center gap-1 pt-0.5 text-[10px] font-bold
+                     transition sm:text-[11px]
                      ${isActive ? 'text-brand' : 'text-ink-ghost hover:text-ink-soft'}`
                   }
                 >
@@ -138,7 +142,9 @@ export function Layout() {
                         <TabIcon d={tab.d} />
                         {dot && <ReminderDot className="absolute top-0.5 right-2" />}
                       </span>
-                      {tab.label}
+                      <span className="w-full truncate px-0.5 text-center">
+                        {tab.label}
+                      </span>
                     </>
                   )}
                 </NavLink>
