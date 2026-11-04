@@ -1,16 +1,73 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Milo IQ design tokens.
+
+   Every value here comes from the design handoff. Screens and components use
+   these names only - no raw hex anywhere else - so a colour or radius changes
+   in one place.
+   --------------------------------------------------------------------------- */
+
 @theme {
-  --color-brand-50: #ecfdf5;
-  --color-brand-100: #d1fae5;
-  --color-brand-200: #a7f3d0;
-  --color-brand-400: #34d399;
-  --color-brand-500: #10b981;
-  --color-brand-600: #059669;
-  --color-brand-700: #047857;
-  /* Dark steps, for text sitting on the brand-50 card surface. */
-  --color-brand-800: #065f46;
-  --color-brand-900: #064e3b;
+  /* --- Type ------------------------------------------------------------- */
+  --font-sans: 'Archivo', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-display: 'Oswald', 'Arial Narrow', Arial, sans-serif;
+  --font-wordmark: 'Black Ops One', 'Archivo', Impact, sans-serif;
+
+  /* --- Ink: text, darkest first ---------------------------------------- */
+  --color-ink: #121614;
+  --color-ink-soft: #4c564f;
+  --color-ink-mute: #5d665f;
+  --color-ink-faint: #6a736c;
+  --color-ink-ghost: #8a928c;
+  --color-ink-off: #b5bbb6;
+
+  /* --- Brand green ------------------------------------------------------ */
+  --color-brand: #1a3c2f;
+  --color-brand-hi: #2e5646;
+  /* Mid green reads on white: the average line and the reminder dot. */
+  --color-brand-mid: #2f8a5b;
+  /* The two light greens only ever sit on the dark hero gradient. */
+  --color-brand-lite: #8fd3a8;
+  --color-brand-pale: #b9dcc6;
+  --color-brand-wash: #eef2ee;
+  --color-brand-pill: #e3ece5;
+  --color-brand-mark: #bfe5cc;
+
+  /* --- Surfaces --------------------------------------------------------- */
+  --color-canvas: #fafaf7;
+  --color-surface: #ffffff;
+  --color-muted: #f4f5f2;
+  --color-cream: #f4efe6;
+  --color-cream-line: #d8cdbb;
+
+  /* --- Lines, lightest use first --------------------------------------- */
+  --color-line-soft: #eef0ec;
+  --color-line: #e6e8e3;
+  --color-line-in: #d9ddd6;
+  --color-line-dash: #c9d3cb;
+  --color-line-mid: #c9cfc9;
+
+  /* --- Signal ----------------------------------------------------------- */
+  --color-over: #c9874e;
+  --color-danger: #9a4a1f;
+
+  /* --- Chart-only ------------------------------------------------------- */
+  --color-raw: #b7c7bd;
+  --color-dot: #8fa99a;
+
+  /* --- Radius ----------------------------------------------------------- */
+  --radius-chip: 10px;
+  --radius-input: 12px;
+  --radius-btn: 14px;
+  --radius-tile: 16px;
+  --radius-card: 22px;
+  --radius-hero: 24px;
+
+  /* --- Shadow ----------------------------------------------------------- */
+  --shadow-card: 0 8px 24px -14px rgb(18 22 20 / 0.12);
+  --shadow-hero: 0 18px 30px -18px rgb(23 53 40 / 0.7);
+  --shadow-lift: 0 10px 24px -12px rgb(0 0 0 / 0.5);
 }
 
 html {
@@ -18,15 +75,61 @@ html {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-canvas font-sans text-ink antialiased;
   /* Respect the notch on phones. */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right)
-           env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* Side and bottom notch insets. The top inset is folded into .screen-top
+     instead, so it cannot stack with the 60px the design puts above a title. */
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* Stop iOS Safari zooming in when a text field is focused. */
 input, select, textarea {
   font-size: 16px;
+}
+
+input {
+  font-family: inherit;
+}
+
+/* ---------------------------------------------------------------------------
+   Repeated treatments that are awkward as utility strings.
+   --------------------------------------------------------------------------- */
+
+/* The dark card. Light text is set by whoever uses it, so a hero can hold
+   its own colour decisions. */
+.hero-surface {
+  background: radial-gradient(110% 120% at 0% 100%, #45705f 0%, #1f4536 50%, #173528 100%);
+}
+
+/* Small uppercase kicker above a heading. The width axis of Archivo does the
+   widening, which is why this is not just letter-spacing. */
+.eyebrow {
+  font-stretch: 125%;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+/* Screen titles and any large figure. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+/* The space above a screen title: the design asks for 60px, and a notched
+   phone needs a little more than its inset. Whichever is larger wins. */
+.screen-top {
+  padding-top: max(60px, calc(env(safe-area-inset-top) + 16px));
+}
+
+/* Figures that change in place shouldn't jitter. */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 /* The save confirmation, rising into place just above the tab bar. */
@@ -41,4 +144,12 @@ input, select, textarea {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-toast-in { animation: none; }
+}
+
+/* The design's own focus treatment, kept global so no field can miss it. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 1px;
 }

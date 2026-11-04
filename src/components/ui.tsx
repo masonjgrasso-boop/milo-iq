@@ -1,62 +1,218 @@
-// Small shared UI pieces. Deliberately plain: the app should feel fast and
-// obvious, so there is no component library here, just a few consistent styles.
+// Shared UI pieces, all built from the tokens in index.css.
+//
+// Screens are assembled from these and nothing else, so spacing, radius and
+// colour stay consistent and a change lands everywhere at once. Nothing here
+// knows about Firebase or app state.
 
 import type { ButtonHTMLAttributes, ComponentPropsWithRef, ReactNode } from 'react';
 
+/* ---------------------------------------------------------------- surfaces */
+
+/** The standard white card. Callers set their own inner spacing. */
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
+    <div className={`rounded-card border border-line bg-surface p-[18px] shadow-card ${className}`}>
       {children}
     </div>
   );
 }
 
+/** The dark green card used for the one number that matters most on a screen. */
+export function HeroCard({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={`hero-surface rounded-hero p-5 text-white shadow-hero ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+/** A quiet box for a line of explanation inside a card. */
+export function NoteBox({ children, tone = 'muted', className = '' }: {
+  children: ReactNode;
+  tone?: 'muted' | 'cream' | 'wash';
+  className?: string;
+}) {
+  const tones = {
+    muted: 'bg-muted text-ink-soft',
+    cream: 'bg-cream text-ink-mute',
+    wash: 'bg-brand-wash text-brand',
+  };
+  return (
+    <div className={`rounded-input px-3 py-2.5 text-[13px] leading-relaxed ${tones[tone]} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+/** Thin rule between rows in a list. */
+export function Divider() {
+  return <div className="h-px bg-line-soft" />;
+}
+
+/* -------------------------------------------------------------- typography */
+
+/** Small uppercase kicker. Sits above a title or labels a section. */
+export function Eyebrow({ children, className = 'text-brand' }: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={`eyebrow ${className}`}>{children}</div>;
+}
+
+/* ----------------------------------------------------------------- buttons */
+
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'onHero' | 'ink';
+  size?: 'sm' | 'md' | 'lg';
+  /** Buttons fill their column by default; `false` makes one hug its label. */
+  block?: boolean;
 };
 
-export function Button({ variant = 'primary', className = '', ...props }: ButtonProps) {
-  const styles =
-    variant === 'primary'
-      ? 'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-700'
-      : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50';
+const VARIANTS = {
+  primary: 'bg-brand text-white hover:bg-brand-hi active:bg-brand-hi',
+  secondary: 'border border-line-in bg-surface text-ink hover:bg-muted',
+  ghost: 'bg-brand-wash text-brand hover:bg-brand-pill',
+  danger: 'bg-transparent text-danger hover:bg-cream',
+  // On the dark hero the roles invert: white block, green label.
+  onHero: 'bg-surface text-brand hover:bg-canvas',
+  ink: 'bg-ink text-white hover:bg-ink/90',
+};
+
+const SIZES = {
+  sm: 'h-[38px] rounded-chip px-4 text-sm',
+  md: 'h-[52px] rounded-btn px-[18px] text-base',
+  lg: 'h-[54px] rounded-btn px-[18px] text-base',
+};
+
+export function Button({
+  variant = 'primary', size = 'md', block = true, className = '', ...props
+}: ButtonProps) {
   return (
     <button
+      type={props.type ?? 'button'}
       {...props}
-      className={`w-full rounded-xl px-4 py-3 text-base font-semibold transition
-        disabled:cursor-not-allowed disabled:opacity-50 ${styles} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 font-bold transition
+        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand
+        disabled:cursor-not-allowed disabled:opacity-50
+        ${block ? 'w-full' : ''} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
     />
   );
 }
 
-export function Field({
-  label, hint, children,
-}: { label: string; hint?: string; children: ReactNode }) {
+/** A square icon-only button, as used by the day stepper on Today. */
+export function IconButton({
+  label, active = true, className = '', ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; active?: boolean }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-slate-700">{label}</span>
+    <button
+      type="button"
+      aria-label={label}
+      {...props}
+      className={`flex h-10 w-10 items-center justify-center rounded-input border text-lg transition
+        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand
+        disabled:cursor-not-allowed
+        ${active
+          ? 'border-line-in bg-surface text-ink hover:bg-muted'
+          : 'border-line bg-muted text-ink-off'} ${className}`}
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ fields */
+
+export function Field({ label, hint, children }: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[13px] font-bold text-ink-soft">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
+      {hint && <span className="text-xs text-ink-faint">{hint}</span>}
     </label>
   );
 }
 
+const INPUT = `h-[46px] w-full rounded-input border border-line-in bg-surface px-[14px]
+  font-bold text-ink placeholder:font-normal placeholder:text-ink-off`;
+
+export function TextInput(props: ComponentPropsWithRef<'input'>) {
+  return <input {...props} className={`${INPUT} ${props.className ?? ''}`} />;
+}
+
 export function NumberInput(props: ComponentPropsWithRef<'input'>) {
   return (
-    <input
-      type="number"
-      inputMode="decimal"
-      {...props}
-      className={`w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-        outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200 ${props.className ?? ''}`}
-    />
+    <input type="number" inputMode="decimal" {...props} className={`${INPUT} ${props.className ?? ''}`} />
   );
 }
 
-/** A row of mutually exclusive buttons — faster to tap than a dropdown. */
-export function Choice<T extends string>({
-  value, options, onChange, columns = 2,
-}: {
+/**
+ * A number with its unit printed inside the box. The border lives on the
+ * label so the whole thing reads as one control, and tapping the unit still
+ * focuses the field.
+ */
+export function UnitInput({ unit, size = 'md', className = '', ...props }:
+Omit<ComponentPropsWithRef<'input'>, 'size'> & { unit: string; size?: 'md' | 'lg' }) {
+  return (
+    <label
+      className={`flex items-center gap-1.5 rounded-btn border border-line-in bg-surface px-[14px]
+        focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-brand
+        ${size === 'lg' ? 'h-[52px]' : 'h-12'} ${className}`}
+    >
+      <input
+        inputMode="decimal"
+        {...props}
+        className={`w-full border-none bg-transparent font-extrabold text-ink outline-none
+          ${size === 'lg' ? 'text-xl' : 'text-[17px]'}`}
+      />
+      <span className="shrink-0 text-sm text-ink-faint">{unit}</span>
+    </label>
+  );
+}
+
+/* ----------------------------------------------------------------- choices */
+
+/**
+ * A segmented control: two or three mutually exclusive options in a tinted
+ * trough. Faster to tap than a dropdown and shows every option at once.
+ */
+export function Segmented<T extends string>({ value, options, onChange, className = '' }: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`grid gap-1.5 rounded-input bg-brand-wash p-1 ${className}`}
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+    >
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(option.value)}
+            className={`h-[38px] rounded-[9px] text-sm font-bold transition
+              focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand
+              ${selected ? 'bg-surface text-brand shadow-sm' : 'bg-transparent text-ink-mute'}`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * A row of outlined choices, for when the options need more room than a
+ * segmented trough gives them.
+ */
+export function Choice<T extends string>({ value, options, onChange, columns = 3 }: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
@@ -70,12 +226,13 @@ export function Choice<T extends string>({
           <button
             key={option.value}
             type="button"
+            aria-pressed={selected}
             onClick={() => onChange(option.value)}
-            className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
-              selected
-                ? 'border-brand-600 bg-brand-50 text-brand-700'
-                : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
+            className={`h-11 rounded-input border text-sm font-bold transition
+              focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand
+              ${selected
+                ? 'border-brand bg-brand text-white'
+                : 'border-line-in bg-surface text-ink hover:bg-muted'}`}
           >
             {option.label}
           </button>
@@ -85,30 +242,83 @@ export function Choice<T extends string>({
   );
 }
 
-/** One labelled figure. Lives here, not in charts, so a card using it
- *  does not drag Recharts into the main bundle. */
+/** A tall option with a supporting line and a radio dot. */
+export function OptionRow({ selected, label, sub, onClick }: {
+  selected: boolean;
+  label: string;
+  sub?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`flex items-center justify-between gap-3 rounded-btn border px-3.5 py-3 text-left transition
+        focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand
+        ${selected ? 'border-brand bg-brand-wash' : 'border-line bg-surface hover:bg-muted'}`}
+    >
+      <span className="flex flex-col gap-0.5">
+        <span className="text-[15px] font-bold text-ink">{label}</span>
+        {sub && <span className="text-[13px] text-ink-mute">{sub}</span>}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2
+          ${selected ? 'border-brand' : 'border-line-mid'}`}
+      >
+        {selected && <span className="h-2.5 w-2.5 rounded-full bg-brand" />}
+      </span>
+    </button>
+  );
+}
+
+/* --------------------------------------------------------------------- bits */
+
+/** One labelled figure in a tinted tile. Three of these fit a phone row. */
 export function Stat({ label, value, tone = 'neutral' }: {
   label: string;
   value: string;
   tone?: 'neutral' | 'good' | 'warn';
 }) {
-  const colors = {
-    neutral: 'text-slate-900',
-    good: 'text-brand-700',
-    warn: 'text-amber-700',
+  const tones = {
+    neutral: 'text-ink',
+    good: 'text-brand',
+    warn: 'text-over',
   };
   return (
-    <div>
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className={`mt-0.5 text-lg font-bold ${colors[tone]}`}>{value}</p>
+    <div className="flex flex-col gap-1 rounded-[14px] bg-brand-wash p-3">
+      <span className="text-[11px] font-bold text-ink-soft">{label}</span>
+      <span className={`tnum text-xl font-extrabold ${tones[tone]}`}>{value}</span>
     </div>
   );
 }
 
+/** A small rounded tag. */
+export function Pill({ children, tone = 'wash' }: {
+  children: ReactNode;
+  tone?: 'wash' | 'onHero';
+}) {
+  const tones = {
+    wash: 'bg-brand-wash text-brand',
+    onHero: 'border border-white/20 bg-white/15 text-white',
+  };
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${tones[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+/** The small green dot that marks something live or next up. */
+export function Dot({ className = 'bg-brand-lite' }: { className?: string }) {
+  return <span aria-hidden="true" className={`h-[7px] w-[7px] shrink-0 rounded-full ${className}`} />;
+}
+
 export function Spinner({ label = 'Loading' }: { label?: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center text-slate-500">
-      <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-brand-600" />
+    <div className="flex min-h-screen items-center justify-center text-ink-mute">
+      <span className="h-6 w-6 animate-spin rounded-full border-2 border-line-in border-t-brand" />
       <span className="sr-only">{label}</span>
     </div>
   );

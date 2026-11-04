@@ -50,3 +50,6 @@ coverage/
 
 # Local Firebase project link (self-hosters run: firebase use --add)
 .firebaserc
+
+# Design handoff archives (kept locally, not source)
+*.zip

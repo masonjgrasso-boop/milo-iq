@@ -4,33 +4,40 @@
 // different measures on different scales, and overlaying them invents visual
 // correlations that are not in the data.
 //
-// Colours are validated for colour-vision deficiency and for contrast against
-// the card surface. Bars also sit on opposite sides of the zero line, so the
-// distinction never rests on colour alone.
+// Colours come from the design tokens. The two bar colours were checked for
+// colour-vision deficiency against each other and the card surface (OKLab
+// ΔE 30.9 under protanopia), and bars also sit on opposite sides of the zero
+// line, so the distinction never rests on colour alone.
 
 import type { ReactNode } from 'react';
 import {
-  Bar, CartesianGrid, Cell, ComposedChart, Line, LineChart, ReferenceLine,
+  Bar, CartesianGrid, ComposedChart, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import type { DeficitPoint } from '../lib/deficit';
 
 export const CHART_COLORS = {
-  onTarget: '#059669',
-  overTarget: '#d97706',
-  reference: '#94a3b8',
-  grid: '#e2e8f0',
-  axis: '#94a3b8',
-  // Validated against both bar colours and the card surface for colour-vision
-  // deficiency and for contrast; it is also a line rather than a bar.
-  average: '#2563eb',
+  /** Under maintenance: the brand green. */
+  under: '#1a3c2f',
+  /** Over maintenance. */
+  over: '#c9874e',
+  /** The running average, a line rather than a fill. */
+  average: '#2f8a5b',
+  /** Weigh-ins as logged, before smoothing. */
+  raw: '#b7c7bd',
+  /** The ring on a weigh-in dot. */
+  dot: '#8fa99a',
+  grid: '#eef0ec',
+  zero: '#c9cfc9',
+  reference: '#8a928c',
+  axis: '#8a928c',
 };
 
 const axisProps = {
-  stroke: CHART_COLORS.axis,
-  tick: { fontSize: 11, fill: '#64748b' },
+  tick: { fontSize: 10, fill: CHART_COLORS.axis },
   tickLine: false,
   axisLine: false,
+  stroke: CHART_COLORS.axis,
 };
 
 /**
@@ -47,12 +54,53 @@ const tickProps = (ticks: string[]) => ({
 const tooltipProps = {
   contentStyle: {
     borderRadius: 12,
-    border: '1px solid #e2e8f0',
+    border: '1px solid #e6e8e3',
     fontSize: 12,
-    boxShadow: '0 4px 12px rgb(15 23 42 / 0.08)',
+    fontWeight: 600,
+    boxShadow: '0 8px 24px -14px rgb(18 22 20 / 0.12)',
   },
-  cursor: { fill: 'rgb(15 23 42 / 0.04)' },
+  cursor: { fill: 'rgb(18 22 20 / 0.04)' },
 };
+
+/** A rounded rectangle with a radius per corner, clamped to fit small bars. */
+function barPath(
+  x: number, y: number, w: number, h: number, top: number, bottom: number,
+): string {
+  const t = Math.min(top, w / 2, h / 2);
+  const b = Math.min(bottom, w / 2, h / 2);
+  return [
+    `M${x + t},${y}`,
+    `H${x + w - t}`,
+    `A${t},${t} 0 0 1 ${x + w},${y + t}`,
+    `V${y + h - b}`,
+    `A${b},${b} 0 0 1 ${x + w - b},${y + h}`,
+    `H${x + b}`,
+    `A${b},${b} 0 0 1 ${x},${y + h - b}`,
+    `V${y + t}`,
+    `A${t},${t} 0 0 1 ${x + t},${y}`,
+    'Z',
+  ].join(' ');
+}
+
+/**
+ * One deficit bar. The end pointing away from maintenance is rounded and the
+ * end touching it stays nearly square, so a bar always reads as growing out
+ * of the zero line rather than floating beside it.
+ */
+function DeficitBar(props: {
+  x?: number; y?: number; width?: number; height?: number;
+  payload?: DeficitPoint;
+}) {
+  const { x = 0, y = 0, width = 0, height = 0, payload } = props;
+  if (!width || !height) return null;
+  const under = (payload?.deficit ?? 0) >= 0;
+  return (
+    <path
+      d={barPath(x, y, width, height, under ? 5 : 2, under ? 2 : 5)}
+      fill={under ? CHART_COLORS.under : CHART_COLORS.over}
+    />
+  );
+}
 
 /**
  * The deficit against maintenance, period by period.
@@ -63,6 +111,8 @@ const tooltipProps = {
  *
  * Three marks on one axis, because all three are calories per day: the bars,
  * a flat line for the deficit the goal asks for, and the running average.
+ * There is no left axis — the goal line carries its own number, which buys
+ * back about fifty pixels of plot on a phone.
  */
 export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
   data: DeficitPoint[];
@@ -74,15 +124,15 @@ export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
 }) {
   return (
     <>
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={190}>
         <ComposedChart
           data={data}
-          margin={{ top: 8, right: 4, bottom: 0, left: -12 }}
+          margin={{ top: 14, right: 2, bottom: 0, left: 2 }}
           barCategoryGap={dense ? '10%' : '22%'}
         >
           <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
           <XAxis dataKey="label" {...axisProps} {...tickProps(ticks)} />
-          <YAxis {...axisProps} width={48} />
+          <YAxis hide />
           <Tooltip
             {...tooltipProps}
             formatter={(value, name) => [
@@ -90,33 +140,34 @@ export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
               name === 'runningAvg'
                 ? 'Average so far'
                 : Number(value) >= 0
-                  ? 'Below maintenance'
-                  : 'Above maintenance',
+                  ? 'Under maintenance'
+                  : 'Over',
             ]}
           />
           {/* Maintenance itself. Crossing it is the only thing that matters. */}
-          <ReferenceLine y={0} stroke={CHART_COLORS.axis} />
+          <ReferenceLine y={0} stroke={CHART_COLORS.zero} />
           <ReferenceLine
             y={goalDeficit}
             stroke={CHART_COLORS.reference}
             strokeDasharray="4 4"
+            strokeWidth={2}
             ifOverflow="extendDomain"
+            label={{
+              value: `Goal ${goalDeficit.toLocaleString()}`,
+              position: 'insideTopRight',
+              fontSize: 10,
+              fontWeight: 700,
+              fill: '#5d665f',
+              dy: -6,
+            }}
           />
-          <Bar dataKey="deficit" radius={2} isAnimationActive={false}>
-            {data.map((point, index) => (
-              <Cell
-                key={index}
-                fill={
-                  (point.deficit ?? 0) >= 0 ? CHART_COLORS.onTarget : CHART_COLORS.overTarget
-                }
-              />
-            ))}
-          </Bar>
+          <Bar dataKey="deficit" shape={<DeficitBar />} isAnimationActive={false} />
           <Line
             type="monotone"
             dataKey="runningAvg"
             stroke={CHART_COLORS.average}
-            strokeWidth={2}
+            strokeWidth={2.5}
+            strokeLinecap="round"
             dot={false}
             connectNulls
             isAnimationActive={false}
@@ -124,14 +175,14 @@ export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
         </ComposedChart>
       </ResponsiveContainer>
 
-      {/* Three marks need naming, and a ReferenceLine cannot appear in a
-          Recharts legend, so the key is written by hand. */}
-      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-        <Key color={CHART_COLORS.onTarget}>Daily deficit</Key>
+      {/* Four marks need naming, and a ReferenceLine cannot appear in a
+          Recharts legend, so the key is written by hand. It also discharges
+          the contrast obligation on the amber, which is below 3:1 on white. */}
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-soft">
+        <Key color={CHART_COLORS.under}>Under maintenance</Key>
+        <Key color={CHART_COLORS.over}>Over</Key>
         <Key color={CHART_COLORS.average} line>Average so far</Key>
-        <Key color={CHART_COLORS.reference} line dashed>
-          Goal ({goalDeficit.toLocaleString()} cal)
-        </Key>
+        <Key color={CHART_COLORS.reference} line dashed>Goal</Key>
       </ul>
     </>
   );
@@ -147,10 +198,15 @@ function Key({ color, line = false, dashed = false, children }: {
     <li className="flex items-center gap-1.5">
       <span
         aria-hidden="true"
-        className={line ? 'h-0.5 w-4 rounded-full' : 'h-2.5 w-2.5 rounded-sm'}
+        className={line ? 'h-[3px] w-4 rounded-full' : 'h-2.5 w-2.5 rounded-[3px]'}
         style={
           dashed
-            ? { backgroundImage: `repeating-linear-gradient(to right, ${color} 0 4px, transparent 4px 7px)`, height: 2, width: 16 }
+            ? {
+                backgroundImage:
+                  `repeating-linear-gradient(to right, ${color} 0 4px, transparent 4px 7px)`,
+                height: 2,
+                width: 16,
+              }
             : { backgroundColor: color }
         }
       />
@@ -159,13 +215,17 @@ function Key({ color, line = false, dashed = false, children }: {
   );
 }
 
-
 export interface WeightPoint {
   label: string;
   weight: number | null;
   trend?: number | null;
 }
 
+/**
+ * Weight over time: the weigh-ins as hollow dots on a thin line, with the
+ * smoothed trend drawn thick on top. The trend is the one to read, so it is
+ * the one that carries the weight of the ink.
+ */
 export function WeightChart({ data, unit, ticks, showTrend = false }: {
   data: WeightPoint[];
   unit: string;
@@ -174,11 +234,18 @@ export function WeightChart({ data, unit, ticks, showTrend = false }: {
   showTrend?: boolean;
 }) {
   return (
-    <ResponsiveContainer width="100%" height={180}>
-      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+    <ResponsiveContainer width="100%" height={168}>
+      <LineChart data={data} margin={{ top: 8, right: 2, bottom: 0, left: 2 }}>
         <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
         <XAxis dataKey="label" {...axisProps} {...tickProps(ticks)} />
-        <YAxis {...axisProps} width={44} domain={['dataMin - 1', 'dataMax + 1']} />
+        <YAxis
+          {...axisProps}
+          orientation="right"
+          width={34}
+          tickCount={3}
+          domain={['dataMin - 1', 'dataMax + 1']}
+          tickFormatter={(value: number) => value.toFixed(1)}
+        />
         <Tooltip
           {...tooltipProps}
           cursor={{ stroke: CHART_COLORS.reference, strokeDasharray: '4 4' }}
@@ -190,10 +257,10 @@ export function WeightChart({ data, unit, ticks, showTrend = false }: {
         <Line
           type="monotone"
           dataKey="weight"
-          stroke={CHART_COLORS.onTarget}
-          strokeWidth={2}
-          dot={{ r: 4, strokeWidth: 0, fill: CHART_COLORS.onTarget }}
-          activeDot={{ r: 6 }}
+          stroke={CHART_COLORS.raw}
+          strokeWidth={1.5}
+          dot={{ r: 3.5, strokeWidth: 2, stroke: CHART_COLORS.dot, fill: '#fff' }}
+          activeDot={{ r: 5, strokeWidth: 2, stroke: CHART_COLORS.dot, fill: '#fff' }}
           connectNulls
           isAnimationActive={false}
         />
@@ -201,9 +268,9 @@ export function WeightChart({ data, unit, ticks, showTrend = false }: {
           <Line
             type="monotone"
             dataKey="trend"
-            stroke={CHART_COLORS.overTarget}
-            strokeWidth={2}
-            strokeDasharray="5 3"
+            stroke={CHART_COLORS.under}
+            strokeWidth={3}
+            strokeLinecap="round"
             dot={false}
             connectNulls
             isAnimationActive={false}
@@ -214,7 +281,6 @@ export function WeightChart({ data, unit, ticks, showTrend = false }: {
   );
 }
 
-/** A single headline number. Clearer than a chart when there is one value. */
 export interface StrengthPoint {
   label: string;
   e1rm: number;
@@ -227,10 +293,16 @@ export interface StrengthPoint {
 export function StrengthChart({ data, unit }: { data: StrengthPoint[]; unit: string }) {
   return (
     <ResponsiveContainer width="100%" height={180}>
-      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+      <LineChart data={data} margin={{ top: 8, right: 2, bottom: 0, left: 2 }}>
         <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
         <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" />
-        <YAxis {...axisProps} width={44} domain={['dataMin - 5', 'dataMax + 5']} />
+        <YAxis
+          {...axisProps}
+          orientation="right"
+          width={38}
+          tickCount={3}
+          domain={['dataMin - 5', 'dataMax + 5']}
+        />
         <Tooltip
           {...tooltipProps}
           cursor={{ stroke: CHART_COLORS.reference, strokeDasharray: '4 4' }}
@@ -239,10 +311,11 @@ export function StrengthChart({ data, unit }: { data: StrengthPoint[]; unit: str
         <Line
           type="monotone"
           dataKey="e1rm"
-          stroke={CHART_COLORS.onTarget}
-          strokeWidth={2}
-          dot={{ r: 4, strokeWidth: 0, fill: CHART_COLORS.onTarget }}
-          activeDot={{ r: 6 }}
+          stroke={CHART_COLORS.under}
+          strokeWidth={3}
+          strokeLinecap="round"
+          dot={{ r: 3.5, strokeWidth: 2, stroke: CHART_COLORS.dot, fill: '#fff' }}
+          activeDot={{ r: 5 }}
           isAnimationActive={false}
         />
       </LineChart>
