@@ -7,6 +7,7 @@ import { Onboarding } from './pages/Onboarding';
 import { Today } from './pages/Today';
 import { More } from './pages/More';
 import { Rules } from './pages/Rules';
+import { RulesEditor } from './pages/RulesEditor';
 import { Account } from './pages/Account';
 import { Maintenance } from './pages/Maintenance';
 import { Privacy, Terms } from './pages/Legal';
@@ -70,6 +71,7 @@ export default function App() {
           <Route path="/photos" element={<Photos />} />
           <Route path="/more" element={<More />} />
           <Route path="/rules" element={<Rules />} />
+          <Route path="/rules/edit" element={<RulesEditor />} />
           <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/account" element={<Account />} />
           <Route path="/groups" element={<Groups />} />

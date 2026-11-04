@@ -155,3 +155,52 @@ export const RULE_TYPE_LABELS: Record<Rule['type'], string> = {
   numeric: 'Hit a daily number',
   weeklyLimit: 'At most N days a week',
 };
+
+/**
+ * Rules in the order the user arranged them.
+ *
+ * `order` is absent on rules made before dragging existed, so those keep the
+ * creation order they already had and sit after anything deliberately placed.
+ * The incoming list is assumed to be in creation order, which is how
+ * `listRules` reads it.
+ */
+export function sortRules(rules: Rule[]): Rule[] {
+  return rules
+    .map((rule, index) => ({ rule, index }))
+    .sort((a, b) => {
+      const left = a.rule.order ?? Number.POSITIVE_INFINITY;
+      const right = b.rule.order ?? Number.POSITIVE_INFINITY;
+      return left - right || a.index - b.index;
+    })
+    .map((entry) => entry.rule);
+}
+
+/** From this hour, an unfinished day earns a dot on the Rules tab. */
+export const REMINDER_HOUR = 18;
+
+/**
+ * Whether to show the reminder dot.
+ *
+ * Evening only, and only while something is genuinely outstanding. The dot
+ * clears the moment the last box is ticked and starts blank again at midnight,
+ * because a new day has its own document.
+ *
+ * Weekly-limit rules are deliberately ignored. Ticking "ate out" records that
+ * it happened; leaving it alone is the good outcome, so counting it as
+ * outstanding would pin the dot on permanently for anyone with such a rule.
+ */
+export function shouldRemind(
+  rules: Rule[],
+  day: DayLog | null,
+  date: DayKey,
+  now: Date,
+): boolean {
+  if (now.getHours() < REMINDER_HOUR) return false;
+
+  const todo = rules.filter(
+    (rule) => rule.type !== 'weeklyLimit' && appliesOn(rule, date),
+  );
+  if (todo.length === 0) return false;
+
+  return todo.some((rule) => !isMet(rule, day?.rules?.[rule.id]));
+}

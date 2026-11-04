@@ -2,6 +2,7 @@
 // thumbs already are on a phone.
 
 import { NavLink, Outlet } from 'react-router-dom';
+import { useRuleReminder } from '../hooks/useRuleReminder';
 import type { ReactNode } from 'react';
 
 interface Tab {
@@ -33,6 +34,17 @@ const TABS: Tab[] = [
     to: '/trends',
     label: 'Trends',
     icon: <path d="M3 16.5l5-5 4 3.5 8-8M15 7h5v5" {...stroke} />,
+  },
+  {
+    to: '/rules',
+    label: 'Rules',
+    icon: (
+      <>
+        <path d="M3.5 7.5L6 10l4.5-5" {...stroke} />
+        <path d="M3.5 17.5L6 20l4.5-5" {...stroke} />
+        <path d="M13.5 8h7M13.5 18h7" {...stroke} />
+      </>
+    ),
   },
   {
     to: '/lift',
@@ -69,6 +81,9 @@ const TABS: Tab[] = [
 ];
 
 export function Layout() {
+  // From 6pm, an unfinished checklist puts a dot on the Rules tab.
+  const remind = useRuleReminder();
+
   return (
     <div className="min-h-screen pb-20">
       <Outlet />
@@ -79,24 +94,39 @@ export function Layout() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <ul className="mx-auto flex max-w-md">
-          {TABS.map((tab) => (
-            <li key={tab.to} className="flex-1">
-              <NavLink
-                to={tab.to}
-                end={tab.to === '/'}
-                className={({ isActive }) =>
-                  `flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition ${
-                    isActive ? 'text-brand-600' : 'text-slate-400 hover:text-slate-600'
-                  }`
-                }
-              >
-                <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
-                  {tab.icon}
-                </svg>
-                {tab.label}
-              </NavLink>
-            </li>
-          ))}
+          {TABS.map((tab) => {
+            const dot = tab.to === '/rules' && remind;
+            return (
+              <li key={tab.to} className="flex-1">
+                <NavLink
+                  to={tab.to}
+                  end={tab.to === '/'}
+                  className={({ isActive }) =>
+                    `flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium transition ${
+                      isActive ? 'text-brand-600' : 'text-slate-400 hover:text-slate-600'
+                    }`
+                  }
+                >
+                  <span className="relative">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+                      {tab.icon}
+                    </svg>
+                    {dot && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute -top-0.5 -right-1 h-2 w-2 rounded-full
+                          bg-brand-600 ring-2 ring-white"
+                      />
+                    )}
+                  </span>
+                  {tab.label}
+                  {/* The dot is colour and position only, so the same news is
+                      spelled out for anyone who cannot see it. */}
+                  {dot && <span className="sr-only">— rules still to do today</span>}
+                </NavLink>
+              </li>
+            );
+          })}
         </ul>
       </nav>
     </div>

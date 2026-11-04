@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   appliesOn, isMet, dayStatus, currentStreak, weekSummary,
-  weeklyLimitStatus, weeklyLimitStreak, RULE_TYPE_LABELS,
+  weeklyLimitStatus, weeklyLimitStreak, RULE_TYPE_LABELS, sortRules, shouldRemind,
 } from './rules';
 import { rangeKeys } from './dates';
 import type { DayLog, Rule } from './types';
@@ -298,5 +298,94 @@ describe('labels', () => {
     expect(Object.keys(RULE_TYPE_LABELS).sort()).toEqual(
       ['boolean', 'numeric', 'weeklyLimit'],
     );
+  });
+});
+
+describe('sortRules', () => {
+  it('uses the arranged order when there is one', () => {
+    const sorted = sortRules([
+      { ...steps, order: 1 },
+      { ...yesNo, order: 0 },
+    ]);
+    expect(sorted.map((rule) => rule.id)).toEqual(['r1', 'r2']);
+  });
+
+  it('keeps creation order for rules never dragged', () => {
+    const sorted = sortRules([yesNo, steps, eatOut]);
+    expect(sorted.map((rule) => rule.id)).toEqual(['r1', 'r2', 'r3']);
+  });
+
+  it('puts unplaced rules after placed ones', () => {
+    const sorted = sortRules([steps, { ...yesNo, order: 0 }]);
+    expect(sorted.map((rule) => rule.id)).toEqual(['r1', 'r2']);
+  });
+
+  it('does not mutate its input', () => {
+    const input = [{ ...steps, order: 1 }, { ...yesNo, order: 0 }];
+    sortRules(input);
+    expect(input[0].id).toBe('r2');
+  });
+});
+
+describe('shouldRemind', () => {
+  const monday = '2026-03-02';
+  const evening = new Date('2026-03-02T18:30:00');
+  const afternoon = new Date('2026-03-02T14:00:00');
+  const day = (values: Record<string, boolean | number>): DayLog => ({
+    date: monday, calories: 0, entries: [], rules: values,
+  });
+
+  it('stays quiet before the evening', () => {
+    expect(shouldRemind([yesNo], null, monday, afternoon)).toBe(false);
+  });
+
+  it('shows up in the evening with something outstanding', () => {
+    expect(shouldRemind([yesNo], null, monday, evening)).toBe(true);
+  });
+
+  it('clears once everything is ticked', () => {
+    expect(shouldRemind([yesNo], day({ r1: true }), monday, evening)).toBe(false);
+  });
+
+  it('still shows when only some are ticked', () => {
+    const rules = [yesNo, steps];
+    expect(shouldRemind(rules, day({ r1: true }), monday, evening)).toBe(true);
+  });
+
+  it('counts a numeric rule short of its goal as outstanding', () => {
+    expect(shouldRemind([steps], day({ r2: 4000 }), monday, evening)).toBe(true);
+  });
+
+  it('clears a numeric rule once the goal is hit', () => {
+    expect(shouldRemind([steps], day({ r2: 10_000 }), monday, evening)).toBe(false);
+  });
+
+  it('ignores weekly-limit rules entirely', () => {
+    // Leaving "ate out" unticked is the good outcome, so it is never a chore.
+    expect(shouldRemind([eatOut], null, monday, evening)).toBe(false);
+  });
+
+  it('stays quiet when no rule applies today', () => {
+    // 2026-03-07 is a Saturday, and this rule is weekdays only.
+    expect(shouldRemind([yesNo], null, '2026-03-07', new Date('2026-03-07T20:00:00')))
+      .toBe(false);
+  });
+
+  it('ignores a paused rule', () => {
+    expect(shouldRemind([{ ...yesNo, active: false }], null, monday, evening)).toBe(false);
+  });
+
+  it('ignores a rule that has not started yet', () => {
+    expect(shouldRemind([{ ...yesNo, startDate: '2026-03-09' }], null, monday, evening))
+      .toBe(false);
+  });
+
+  it('stays quiet with no rules at all', () => {
+    expect(shouldRemind([], null, monday, evening)).toBe(false);
+  });
+
+  it('turns on exactly at six', () => {
+    expect(shouldRemind([yesNo], null, monday, new Date('2026-03-02T17:59:00'))).toBe(false);
+    expect(shouldRemind([yesNo], null, monday, new Date('2026-03-02T18:00:00'))).toBe(true);
   });
 });

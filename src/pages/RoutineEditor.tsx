@@ -11,10 +11,11 @@ import { useToast } from '../context/toast-context';
 import { useExercises } from '../hooks/useExercises';
 import { deleteRoutine, getRoutine, saveRoutine } from '../data/routines';
 import {
-  clampSets, DEFAULT_SETS, moveItem, plannedSetCount,
+  clampSets, DEFAULT_SETS, plannedSetCount,
 } from '../lib/routines';
 import type { Routine, RoutineExercise } from '../lib/types';
 import { Button, Card, NumberInput } from '../components/ui';
+import { moveItem } from '../lib/order';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { DragHandle, SortableList } from '../components/SortableList';
 import { Page } from '../components/Layout';

@@ -102,6 +102,8 @@ export interface Rule {
   unit?: string;
   /** Monday-indexed weekdays the rule applies to. Empty means every day. */
   daysOfWeek: number[];
+  /** Position in the checklist. Absent on rules made before ordering existed. */
+  order?: number;
   active: boolean;
   /**
    * The first day the rule counts for. A rule cannot have been kept or broken

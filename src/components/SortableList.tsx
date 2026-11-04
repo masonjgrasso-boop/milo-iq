@@ -9,7 +9,7 @@
 // from a keyboard and for anyone who cannot drag.
 
 import { useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
-import { moveItem } from '../lib/routines';
+import { moveItem } from '../lib/order';
 
 /** Spread onto whatever the row uses as its grip. */
 export interface DragHandleProps {

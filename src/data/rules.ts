@@ -4,10 +4,12 @@
 // stored on that day's log, so checking a box costs no extra document.
 
 import {
-  collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc,
+  collection, deleteDoc, doc, getDocs, orderBy, query, serverTimestamp, setDoc,
+  updateDoc, writeBatch,
 } from 'firebase/firestore';
 import { getDb } from '../lib/firebase';
 import { toDayKey, todayKey } from '../lib/dates';
+import { renumber } from '../lib/order';
 import type { Rule } from '../lib/types';
 
 /**
@@ -50,4 +52,20 @@ export async function updateRule(
 
 export async function deleteRule(uid: string, ruleId: string): Promise<void> {
   await deleteDoc(doc(rulesCollection(uid), ruleId));
+}
+
+/**
+ * Writes a whole reordered checklist in one batch, with no gaps left behind.
+ *
+ * Rules made before dragging existed have no `order` at all, so the first
+ * reorder stamps every one of them.
+ */
+export async function reorderRules(uid: string, ordered: Rule[]): Promise<Rule[]> {
+  const numbered = renumber(ordered.map((rule, index) => ({ ...rule, order: index })));
+  const batch = writeBatch(getDb());
+  for (const rule of numbered) {
+    batch.set(doc(rulesCollection(uid), rule.id), { order: rule.order }, { merge: true });
+  }
+  await batch.commit();
+  return numbered;
 }

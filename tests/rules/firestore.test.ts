@@ -148,6 +148,32 @@ describe('a user and their own data', () => {
       }),
     );
   });
+
+  // Personal rules. The checklist tab keeps a live listener on this
+  // collection, which is a list operation, so that is asserted on purpose.
+  it('can read, list and write its own rules', async () => {
+    await assertSucceeds(
+      setDoc(doc(asBob(), 'users', BOB, 'rules', 'r1'), {
+        name: '10k steps', type: 'numeric', target: 10000, daysOfWeek: [], active: true,
+      }),
+    );
+    await assertSucceeds(getDoc(doc(asBob(), 'users', BOB, 'rules', 'r1')));
+    await assertSucceeds(getDocs(query(collection(asBob(), 'users', BOB, 'rules'))));
+  });
+
+  it('cannot touch another user’s rules', async () => {
+    await assertFails(getDocs(query(collection(asAlice(), 'users', BOB, 'rules'))));
+    await assertFails(getDoc(doc(asAlice(), 'users', BOB, 'rules', 'r1')));
+    await assertFails(
+      setDoc(doc(asAlice(), 'users', BOB, 'rules', 'r1'), { name: 'Hijacked' }),
+    );
+    await assertFails(getDocs(query(collection(asAnon(), 'users', BOB, 'rules'))));
+  });
+
+  // The dot on the Rules tab watches today's day document.
+  it('can listen to its own day document', async () => {
+    await assertSucceeds(getDoc(doc(asBob(), 'users', BOB, 'days', '2026-03-04')));
+  });
 });
 
 describe('group documents', () => {

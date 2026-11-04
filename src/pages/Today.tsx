@@ -4,32 +4,29 @@ import { useToast } from '../context/toast-context';
 import { useDay } from '../hooks/useDay';
 import { useDayRange } from '../hooks/useDayRange';
 import { deleteFood, listFoods, saveFood, touchFood } from '../data/foods';
-import { listRules } from '../data/rules';
 import { todayKey, friendlyDayLabel, addDays, startOfMonth, startOfWeek } from '../lib/dates';
 import { formatWeight, fromKg, toKg, weightUnitLabel } from '../lib/units';
 import { planCatchUpForUser } from '../lib/catchup';
 import { estimateMaintenance, MAX_WINDOW_DAYS } from '../lib/maintenance';
 import { maintenanceBasis, paceSummary } from '../lib/pace';
 import { latestTrend, trendSeries } from '../lib/trend';
-import type { Rule, SavedFood } from '../lib/types';
+import type { SavedFood } from '../lib/types';
 import { Button, Card, NumberInput } from '../components/ui';
 import { FoodAdder } from '../components/FoodAdder';
 import { CatchUpCard } from '../components/CatchUpCard';
 import { PaceCard } from '../components/PaceCard';
-import { RuleChecklist } from '../components/RuleChecklist';
 import { Page } from '../components/Layout';
 
 export function Today() {
   const { user, profile } = useAuth();
   const notify = useToast();
   const [date, setDate] = useState(todayKey());
-  const { day, loading, saving, error, addEntry, removeEntry, setWeight, setRuleValue } =
+  const { day, loading, saving, error, addEntry, removeEntry, setWeight } =
     useDay(date);
 
   const [foods, setFoods] = useState<SavedFood[]>([]);
   const [weightInput, setWeightInput] = useState('');
 
-  const [rules, setRules] = useState<Rule[]>([]);
 
   // One read serves everything on this screen: the week and month pace
   // figures, the maintenance window, the catch-up look-back and the rule
@@ -52,10 +49,6 @@ export function Today() {
       ) ?? null,
     [history],
   );
-  const weekDays = useMemo(
-    () => history?.filter((past) => past.date >= startOfWeek(todayKey())) ?? [],
-    [history],
-  );
 
   // Maintenance: measured once there is enough history, the onboarding
   // estimate until then. Everything below is framed against this number.
@@ -71,7 +64,6 @@ export function Today() {
   useEffect(() => {
     if (!user) return;
     listFoods(user.uid).then(setFoods);
-    listRules(user.uid).then(setRules);
   }, [user]);
 
   // Reflect whatever is already stored for the day being viewed.
@@ -276,15 +268,6 @@ export function Today() {
           <p className="text-sm text-slate-500">Nothing logged yet.</p>
         )}
       </Card>
-
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Rules</h2>
-      <RuleChecklist
-        rules={rules}
-        date={date}
-        day={day}
-        weekDays={weekDays}
-        onChange={setRuleValue}
-      />
 
       <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Weight</h2>
       <Card>

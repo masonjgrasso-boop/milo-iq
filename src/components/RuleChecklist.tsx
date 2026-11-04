@@ -1,11 +1,15 @@
-// Today's rules, checked off in place.
+// Today's rules, as a checklist built for a thumb.
 //
 // Only rules that apply today are shown, so a weekday rule does not sit there
-// on a Saturday looking like something you failed to do.
+// on a Saturday looking like something you failed to do. Nothing needs
+// clearing at the end of the day: check-offs live on the day's own document,
+// so tomorrow starts blank on its own.
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { appliesOn, isMet, weeklyLimitStatus } from '../lib/rules';
+import {
+  appliesOn, currentStreak, isMet, sortRules, weeklyLimitStatus, weeklyLimitStreak,
+} from '../lib/rules';
 import type { DayKey } from '../lib/dates';
 import type { DayLog, Rule } from '../lib/types';
 import { Card, NumberInput } from './ui';
@@ -14,12 +18,15 @@ interface Props {
   rules: Rule[];
   date: DayKey;
   day: DayLog | null;
+  /** This week only, for the weekly-limit line. */
   weekDays: DayLog[];
+  /** Enough history for the streak numbers. */
+  historyDays: DayLog[];
   onChange: (ruleId: string, value: boolean | number | undefined) => void;
 }
 
-export function RuleChecklist({ rules, date, day, weekDays, onChange }: Props) {
-  const todays = rules.filter((rule) => appliesOn(rule, date));
+export function RuleChecklist({ rules, date, day, weekDays, historyDays, onChange }: Props) {
+  const todays = sortRules(rules).filter((rule) => appliesOn(rule, date));
 
   if (rules.length === 0) {
     return (
@@ -29,7 +36,7 @@ export function RuleChecklist({ rules, date, day, weekDays, onChange }: Props) {
           10k steps, eating out once a week.
         </p>
         <Link
-          to="/rules"
+          to="/rules/edit"
           className="mt-3 inline-block text-sm font-semibold text-brand-600 hover:text-brand-700"
         >
           Create your first rule &rarr;
@@ -47,60 +54,120 @@ export function RuleChecklist({ rules, date, day, weekDays, onChange }: Props) {
   }
 
   return (
-    <Card>
-      <ul className="divide-y divide-slate-100">
-        {todays.map((rule) => {
-          const value = day?.rules?.[rule.id];
+    <ul className="space-y-2">
+      {todays.map((rule) => {
+        const value = day?.rules?.[rule.id];
+        const streak =
+          rule.type === 'weeklyLimit'
+            ? weeklyLimitStreak(rule, historyDays, date)
+            : currentStreak(rule, historyDays, date);
 
-          if (rule.type === 'numeric') {
-            return <NumericRow key={rule.id} rule={rule} value={value} onCommit={onChange} />;
-          }
-
-          const checked = value === true;
-          const weekly =
-            rule.type === 'weeklyLimit' ? weeklyLimitStatus(rule, weekDays, date) : null;
-
+        if (rule.type === 'numeric') {
           return (
-            <li key={rule.id} className="py-3">
-              <label className="flex cursor-pointer items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(event) => onChange(rule.id, event.target.checked || undefined)}
-                  className="h-5 w-5 shrink-0 rounded border-slate-300 accent-brand-600"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-slate-900">{rule.name}</span>
-                  {weekly && (
-                    <span
-                      className={`block text-xs ${
-                        weekly.withinLimit ? 'text-slate-500' : 'text-amber-600'
-                      }`}
-                    >
-                      {weekly.used} of {weekly.limit} used this week
-                      {!weekly.withinLimit && ' — over, but next week is a clean slate'}
-                    </span>
-                  )}
-                </span>
-              </label>
-            </li>
+            <NumericRow
+              key={rule.id}
+              rule={rule}
+              value={value}
+              streak={streak}
+              onCommit={onChange}
+            />
           );
-        })}
-      </ul>
-    </Card>
+        }
+
+        return (
+          <CheckRow
+            key={rule.id}
+            rule={rule}
+            checked={value === true}
+            streak={streak}
+            weekly={
+              rule.type === 'weeklyLimit' ? weeklyLimitStatus(rule, weekDays, date) : null
+            }
+            onToggle={(next) => onChange(rule.id, next || undefined)}
+          />
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Small, never shouty. A streak is encouragement, not a scoreboard. */
+function Streak({ count, weekly }: { count: number; weekly: boolean }) {
+  if (count === 0) return null;
+  const unit = weekly
+    ? count === 1
+      ? 'week'
+      : 'weeks'
+    : count === 1
+      ? 'day'
+      : 'days';
+  return (
+    <span className="block text-xs text-slate-400">
+      {count} {unit} in a row
+    </span>
+  );
+}
+
+/** A yes/no or weekly-limit rule. The whole row is the tap target. */
+function CheckRow({ rule, checked, streak, weekly, onToggle }: {
+  rule: Rule;
+  checked: boolean;
+  streak: number;
+  weekly: ReturnType<typeof weeklyLimitStatus> | null;
+  onToggle: (next: boolean) => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onToggle(!checked)}
+        aria-pressed={checked}
+        className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-4 text-left
+          shadow-sm transition ${
+            checked
+              ? 'border-brand-300 bg-brand-50'
+              : 'border-slate-200 bg-white hover:bg-slate-50'
+          }`}
+      >
+        <Tick checked={checked} />
+        <span className="min-w-0 flex-1">
+          <span
+            className={`block truncate font-medium ${
+              checked ? 'text-brand-900' : 'text-slate-900'
+            }`}
+          >
+            {rule.name}
+          </span>
+          {weekly ? (
+            <span
+              className={`block text-xs ${
+                weekly.withinLimit ? 'text-slate-500' : 'text-amber-600'
+              }`}
+            >
+              {weekly.used} of {weekly.limit} used this week
+              {!weekly.withinLimit && ' — over, but next week is a clean slate'}
+            </span>
+          ) : (
+            <Streak count={streak} weekly={false} />
+          )}
+        </span>
+      </button>
+    </li>
   );
 }
 
 /**
  * A numeric rule's daily figure.
  *
- * The value is held locally while it is being typed and written once the field
- * is left or Enter is pressed. Saving per keystroke would mean a write and a
- * confirmation for every digit of "10000".
+ * Two ways in, because both get wanted: type the real number, or tap Done and
+ * have the goal recorded. The typed value is held locally and written once the
+ * field is left or Enter is pressed — saving per keystroke would mean a write
+ * and a confirmation for every digit of "10000".
  */
-function NumericRow({ rule, value, onCommit }: {
+function NumericRow({ rule, value, streak, onCommit }: {
   rule: Rule;
   value: boolean | number | undefined;
+  streak: number;
   onCommit: (ruleId: string, value: boolean | number | undefined) => void;
 }) {
   const stored = value === undefined ? '' : String(value);
@@ -127,26 +194,76 @@ function NumericRow({ rule, value, onCommit }: {
   }
 
   return (
-    <li className="flex items-center justify-between gap-3 py-3">
-      <div className="min-w-0">
-        <p className="truncate font-medium text-slate-900">{rule.name}</p>
-        <p className="text-xs text-slate-500">
-          Goal {rule.target.toLocaleString()} {rule.unit ?? ''}
-          {met && <span className="ml-1 font-medium text-brand-600">&middot; hit</span>}
-        </p>
+    <li
+      className={`rounded-2xl border px-4 py-4 shadow-sm transition ${
+        met ? 'border-brand-300 bg-brand-50' : 'border-slate-200 bg-white'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <Tick checked={met} />
+        <div className="min-w-0 flex-1">
+          <p className={`truncate font-medium ${met ? 'text-brand-900' : 'text-slate-900'}`}>
+            {rule.name}
+          </p>
+          <p className="text-xs text-slate-500">
+            Goal {rule.target.toLocaleString()} {rule.unit ?? ''}
+          </p>
+          <Streak count={streak} weekly={false} />
+        </div>
       </div>
-      <div className="flex w-32 shrink-0 items-center gap-2">
-        <NumberInput
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={commit}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') event.currentTarget.blur();
-          }}
-          aria-label={rule.name}
-          className={met ? 'border-brand-500 bg-brand-50' : ''}
-        />
+
+      <div className="mt-3 flex items-center gap-2 pl-11">
+        <span className="w-28">
+          <NumberInput
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commit}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur();
+            }}
+            placeholder={rule.unit ?? 'Amount'}
+            aria-label={rule.name}
+            className={met ? 'border-brand-500 bg-white' : ''}
+          />
+        </span>
+        <button
+          type="button"
+          onClick={() => onCommit(rule.id, met ? undefined : rule.target)}
+          className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+            met
+              ? 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'
+              : 'border-brand-300 bg-brand-50 text-brand-700 hover:bg-brand-100'
+          }`}
+        >
+          {met ? 'Clear' : 'Done'}
+        </button>
       </div>
     </li>
+  );
+}
+
+/** The checkmark itself: big enough to read at a glance. */
+function Tick({ checked }: { checked: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2
+        transition ${
+          checked
+            ? 'border-brand-600 bg-brand-600 text-white'
+            : 'border-slate-300 bg-white text-transparent'
+        }`}
+    >
+      <svg viewBox="0 0 24 24" className="h-5 w-5">
+        <path
+          d="M5 13l4 4L19 7"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
   );
 }

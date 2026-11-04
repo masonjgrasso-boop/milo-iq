@@ -44,18 +44,6 @@ export function More() {
       </Card>
 
       <Card className="mt-3">
-        <Link to="/rules" className="flex items-center justify-between">
-          <span>
-            <span className="block text-sm font-semibold text-slate-900">Rules</span>
-            <span className="block text-xs text-slate-500">
-              Habits you hold yourself to, with streaks
-            </span>
-          </span>
-          <span aria-hidden="true" className="text-slate-400">&rarr;</span>
-        </Link>
-      </Card>
-
-      <Card className="mt-3">
         <Link to="/groups" className="flex items-center justify-between">
           <span>
             <span className="block text-sm font-semibold text-slate-900">Groups</span>

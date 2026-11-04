@@ -53,6 +53,15 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
+      // Personal rules, and the day documents that hold each day's check-offs.
+      match /rules/{ruleId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /days/{date} {
+        allow read, write: if isOwner(uid);
+      }
+
       match /exercises/{exerciseId} {
         allow read, write: if isOwner(uid);
 

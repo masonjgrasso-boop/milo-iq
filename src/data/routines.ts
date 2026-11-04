@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { getDb } from '../lib/firebase';
 import type { DayKey } from '../lib/dates';
-import { nextOrder, renumber } from '../lib/routines';
+import { nextOrder, renumber } from '../lib/order';
 import type { Routine, RoutineExercise } from '../lib/types';
 
 export const routinesCollection = (uid: string) =>
