@@ -5,7 +5,9 @@ import { saveProfile } from '../lib/profile';
 import { feetInchesToCm, toKg, weightUnitLabel, lbToKg } from '../lib/units';
 import { ACTIVITY_LABELS, calculateCalorieTarget } from '../lib/targets';
 import type { ActivityLevel, Goal, Sex, UnitSystem, UserProfile } from '../lib/types';
-import { Button, Card, Choice, Field, NumberInput } from '../components/ui';
+import {
+  Button, Card, Choice, Eyebrow, Field, OptionRow, Segmented, UnitInput,
+} from '../components/ui';
 
 // Weekly rate choices, offered in whatever units the user picked but always
 // stored in kg.
@@ -14,6 +16,18 @@ const RATE_OPTIONS: Record<UnitSystem, number[]> = {
   metric: [0.25, 0.5, 0.75, 1],
 };
 const DEFAULT_RATE: Record<UnitSystem, number> = { imperial: 1, metric: 0.5 };
+
+/**
+ * The second line on each activity option. The label itself comes from the
+ * shared ACTIVITY_LABELS, so these only say what that does not: what the
+ * week actually feels like.
+ */
+const ACTIVITY_DETAIL: Record<ActivityLevel, string> = {
+  sedentary: 'Desk job, nothing deliberate',
+  light: 'A walk most days, or a couple of sessions',
+  moderate: 'Training is part of your week',
+  very: 'Training is most of your week',
+};
 
 export function Onboarding() {
   const { user, setProfile } = useAuth();
@@ -78,16 +92,23 @@ export function Onboarding() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-5 py-8">
-      <h1 className="text-2xl font-bold text-ink">Let&rsquo;s set you up</h1>
-      <p className="mt-1 text-ink-soft">
-        A few quick answers. You can change any of them later.
-      </p>
+    <>
+      {/* The target card and the button are pinned to the bottom, so the
+          number reacts as the form is filled in without being scrolled away.
+          The padding here is what keeps the last card clear of them. */}
+      <div className="screen-top mx-auto flex max-w-md flex-col gap-[18px] px-5 pb-[220px]">
+        <header className="flex flex-col gap-2">
+          <Eyebrow>Set up &middot; 1 minute</Eyebrow>
+          <h1 className="display text-[38px] text-ink">Let&rsquo;s find your number</h1>
+          <p className="text-[15px] leading-snug text-ink-soft">
+            A starting estimate. Milo swaps it for your real maintenance once you have
+            logged a couple of weeks.
+          </p>
+        </header>
 
-      <div className="mt-6 space-y-4">
-        <Card>
+        <Card className="flex flex-col gap-4">
           <Field label="Units">
-            <Choice
+            <Segmented
               value={units}
               onChange={changeUnits}
               options={[
@@ -96,46 +117,59 @@ export function Onboarding() {
               ]}
             />
           </Field>
-        </Card>
 
-        <Card className="space-y-4">
-          {units === 'metric' ? (
-            <Field label="Height">
-              <NumberInput value={cm} onChange={(e) => setCm(e.target.value)} placeholder="178" />
-            </Field>
-          ) : (
-            <Field label="Height">
+          <Field label="Height">
+            {units === 'metric' ? (
+              <UnitInput
+                unit="cm"
+                value={cm}
+                onChange={(e) => setCm(e.target.value)}
+                placeholder="178"
+                aria-label="Height in centimetres"
+              />
+            ) : (
               <div className="grid grid-cols-2 gap-2">
-                <NumberInput
+                <UnitInput
+                  unit="ft"
                   value={feet}
                   onChange={(e) => setFeet(e.target.value)}
                   placeholder="5"
                   aria-label="Feet"
                 />
-                <NumberInput
+                <UnitInput
+                  unit="in"
                   value={inches}
                   onChange={(e) => setInches(e.target.value)}
                   placeholder="10"
                   aria-label="Inches"
                 />
               </div>
+            )}
+          </Field>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field label="Weight">
+              <UnitInput
+                unit={weightUnitLabel(units)}
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                placeholder={units === 'metric' ? '80' : '176'}
+                aria-label={`Current weight in ${weightUnitLabel(units)}`}
+              />
             </Field>
-          )}
-
-          <Field label={`Current weight (${weightUnitLabel(units)})`}>
-            <NumberInput
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              placeholder={units === 'metric' ? '80' : '176'}
-            />
-          </Field>
-
-          <Field label="Age">
-            <NumberInput value={age} onChange={(e) => setAge(e.target.value)} placeholder="30" />
-          </Field>
+            <Field label="Age">
+              <UnitInput
+                unit="yrs"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                placeholder="30"
+                aria-label="Age in years"
+              />
+            </Field>
+          </div>
 
           <Field label="Sex" hint="Used only for the calorie formula.">
-            <Choice
+            <Segmented
               value={sex}
               onChange={setSex}
               options={[
@@ -146,29 +180,28 @@ export function Onboarding() {
           </Field>
         </Card>
 
-        <Card>
-          <Field
-            label="Typical activity"
-            hint="A rough starting point. Milo IQ measures your real number once you have two weeks of logs."
-          >
-            <Choice
-              value={activity}
-              onChange={setActivity}
-              columns={1}
-              options={(Object.keys(ACTIVITY_LABELS) as ActivityLevel[]).map((value) => ({
-                value,
-                label: ACTIVITY_LABELS[value],
-              }))}
+        <Card className="flex flex-col gap-2.5">
+          <span className="text-[13px] font-bold text-ink-soft">Activity level</span>
+          {(Object.keys(ACTIVITY_LABELS) as ActivityLevel[]).map((value) => (
+            <OptionRow
+              key={value}
+              selected={activity === value}
+              label={ACTIVITY_LABELS[value]}
+              sub={ACTIVITY_DETAIL[value]}
+              onClick={() => setActivity(value)}
             />
-          </Field>
+          ))}
+          <p className="text-xs text-ink-faint">
+            A rough starting point. Milo IQ measures your real number once you have two
+            weeks of logs.
+          </p>
         </Card>
 
-        <Card className="space-y-4">
+        <Card className="flex flex-col gap-4">
           <Field label="Goal">
-            <Choice
+            <Segmented
               value={goal}
               onChange={setGoal}
-              columns={3}
               options={[
                 { value: 'lose', label: 'Lose' },
                 { value: 'maintain', label: 'Maintain' },
@@ -178,52 +211,72 @@ export function Onboarding() {
           </Field>
 
           {goal !== 'maintain' && (
-            <Field label={`Target rate (${weightUnitLabel(units)} per week)`}>
+            <Field label="Rate per week">
               <Choice
                 value={String(rate)}
                 onChange={(value) => setRate(Number(value))}
                 columns={4}
                 options={RATE_OPTIONS[units].map((value) => ({
                   value: String(value),
-                  label: String(value),
+                  label: `${value} ${weightUnitLabel(units)}`,
                 }))}
               />
             </Field>
           )}
         </Card>
 
-        {preview && (
-          <Card className="border-brand-pill bg-brand-wash">
-            <p className="text-sm font-medium text-brand">Your starting daily target</p>
-            <p className="mt-1 text-3xl font-bold text-brand">
-              {preview.calorieTarget.toLocaleString()}{' '}
-              <span className="text-lg font-semibold">cal</span>
-            </p>
-            {preview.clampedToFloor && (
-              <p className="mt-2 text-sm text-brand">
-                That rate would push you below a safe intake, so your target is set at the
-                floor instead. A slower rate will feel much better.
-              </p>
-            )}
-          </Card>
-        )}
-
         {error && (
-          <p role="alert" className="text-sm text-danger">
+          <p role="alert" className="text-sm font-semibold text-danger">
             {error}
           </p>
         )}
-
-        <Button onClick={handleSubmit} disabled={!valid || saving}>
-          {saving ? 'Saving…' : 'Start tracking'}
-        </Button>
-
-        {!valid && (
-          <p className="text-center text-xs text-ink-mute">
-            Fill in your height, weight and age to continue.
-          </p>
-        )}
       </div>
-    </div>
+
+      <div
+        className="fixed inset-x-0 bottom-0 z-10"
+        style={{
+          background:
+            'linear-gradient(rgb(250 250 247 / 0), var(--color-canvas) 18%)',
+        }}
+      >
+        <div
+          className="mx-auto flex max-w-md flex-col gap-2.5 px-4 pt-3"
+          style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
+        >
+          <div className="hero-surface flex items-end justify-between gap-3 rounded-card px-[18px] py-4 text-white">
+            <div className="flex flex-col gap-1">
+              <Eyebrow className="text-[10px] text-brand-pale">Daily target</Eyebrow>
+              <p className="flex items-baseline gap-1.5">
+                <span className="display tnum text-[40px]">
+                  {preview ? preview.calorieTarget.toLocaleString() : '—'}
+                </span>
+                <span className="text-sm opacity-80">cal</span>
+              </p>
+            </div>
+            <p className="text-right text-xs leading-relaxed opacity-85">
+              {preview ? (
+                <>
+                  Est. maintenance {preview.tdee.toLocaleString()}
+                  <br />
+                  {preview.clampedToFloor
+                    ? 'Held at a safe floor'
+                    : goal === 'maintain'
+                      ? 'Holding steady'
+                      : `${Math.abs(
+                          preview.tdee - preview.calorieTarget,
+                        ).toLocaleString()} ${goal === 'lose' ? 'below' : 'above'} it`}
+                </>
+              ) : (
+                'Fill in your height, weight and age'
+              )}
+            </p>
+          </div>
+
+          <Button variant="ink" onClick={handleSubmit} disabled={!valid || saving}>
+            {saving ? 'Saving…' : 'Start tracking'}
+          </Button>
+        </div>
+      </div>
+    </>
   );
 }
