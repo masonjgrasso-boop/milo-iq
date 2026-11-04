@@ -22,7 +22,7 @@ import {
 import { trendChangeKg, trendSeries } from '../lib/trend';
 import { formatWeight, fromKg, weightUnitLabel } from '../lib/units';
 import type { UserProfile } from '../lib/types';
-import { Card, Choice } from '../components/ui';
+import { Card, NoteBox, Segmented } from '../components/ui';
 import { DeficitChart, WeightChart, type WeightPoint } from '../components/charts';
 import { DeficitSummaryCard } from '../components/DeficitSummaryCard';
 import { MaintenanceBox } from '../components/MaintenanceBox';
@@ -35,11 +35,11 @@ export function Trends() {
   if (!profile) return null;
 
   return (
-    <Page title="Trends">
-      <Choice
+    <Page eyebrow="The long view" title="Trends">
+      <Segmented
         value={range}
         onChange={setRange}
-        columns={3}
+        size="lg"
         options={[
           { value: 'week', label: 'Week' },
           { value: 'month', label: 'Month' },
@@ -192,7 +192,7 @@ function Body({
 }) {
   if (loading) {
     return (
-      <Card className="mt-4">
+      <Card>
         <p className="py-16 text-center text-sm text-ink-ghost">Loading…</p>
       </Card>
     );
@@ -201,52 +201,69 @@ function Body({
   return (
     <>
       {/* Maintenance leads: it is the number every other figure here is
-          measured against, so it belongs above them and kept to one strip. */}
-      <div className="mt-4">
-        <MaintenanceBox result={result} basis={basis} profile={profile} />
-      </div>
+          measured against, so it belongs above them and it is the one figure
+          on the screen that gets the dark card. */}
+      <MaintenanceBox result={result} basis={basis} profile={profile} />
 
       {/* Nothing logged at all: one friendly line beats a graph full of zeros. */}
       {pace.daysLogged === 0 ? (
-        <Card className="mt-4">
+        <Card>
           <p className="py-12 text-center text-sm text-ink-soft">
             Log a few days to see your trend.
           </p>
         </Card>
       ) : (
         <>
-          <Card className="mt-4">
-            <p className="text-sm font-medium text-ink-soft">
-              {weightLine(weightChangeKg, range, profile)}
-            </p>
+          <Card className="flex flex-col gap-3.5">
+            <ChartHeading label="Weight" headline={weightLine(weightChangeKg, range, profile)} />
             {weightChangeKg !== null && (
-              <div className="mt-3">
-                <WeightChart
-                  data={weightPoints}
-                  unit={weightUnitLabel(profile.units)}
-                  ticks={ticks}
-                  showTrend
-                />
-              </div>
+              <WeightChart
+                data={weightPoints}
+                unit={weightUnitLabel(profile.units)}
+                ticks={ticks}
+                showTrend
+              />
             )}
           </Card>
 
-          <Card className="mt-4">
+          <Card className="flex flex-col gap-3.5">
+            <ChartHeading label="Daily deficit" headline={deficitLine(pace, range)} />
             <DeficitChart
               data={points}
               goalDeficit={pace.targetPerDay}
               ticks={ticks}
               dense={dense}
             />
+            <NoteBox tone="cream">
+              An over day is just one bar. The average line is the one to watch.
+            </NoteBox>
           </Card>
 
-          <div className="mt-4">
-            <DeficitSummaryCard pace={pace} range={range} sex={profile.sex} />
-          </div>
+          <DeficitSummaryCard pace={pace} range={range} sex={profile.sex} />
         </>
       )}
     </>
   );
+}
+
+/** The two lines above a chart: what it measures, then where it stands. */
+function ChartHeading({ label, headline }: { label: string; headline: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-xs font-bold text-ink-mute">{label}</p>
+      <p className="text-[17px] font-extrabold text-ink">{headline}</p>
+    </div>
+  );
+}
+
+/** The deficit chart's own headline, in the same shape as the weight one. */
+function deficitLine(pace: PaceSummary, range: TrendRange): string {
+  const when = RANGE_LABELS[range];
+  const amount = Math.abs(Math.round(pace.actualPerDay)).toLocaleString();
+
+  if (pace.actualPerDay > 0) return `Averaging ${amount} under maintenance over ${when}.`;
+  if (pace.actualPerDay === 0) return `Sitting right at maintenance over ${when}.`;
+  return `Averaging ${amount} over maintenance across ${when}.`;
 }
 
 function weightLine(

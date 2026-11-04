@@ -64,8 +64,8 @@ export function DeficitSummaryCard({ pace, range, sex }: {
   const onTrack = !plan.needed;
 
   return (
-    <Card>
-      <div className="grid grid-cols-3 gap-3">
+    <Card className="flex flex-col gap-3.5">
+      <div className="grid grid-cols-3 gap-2">
         <Stat label="Goal deficit" value={signed(pace.targetPerDay)} />
         <Stat
           label="Your average"
@@ -79,13 +79,13 @@ export function DeficitSummaryCard({ pace, range, sex }: {
         />
       </div>
 
-      <p className="mt-3 text-sm text-ink-soft">
+      <p className="text-sm text-ink-soft">
         {verdict(pace, plan, safeMinimum, pace.targetCalories)}
       </p>
 
       {/* The maintenance figure itself is named in the box above, so this says
           only what the numbers are measured over. */}
-      <p className="mt-3 border-t border-line-soft pt-3 text-xs text-ink-mute">
+      <p className="border-t border-line-soft pt-3 text-xs text-ink-faint">
         Calories per day against maintenance, across the {pace.daysLogged}{' '}
         {pace.daysLogged === 1 ? 'day' : 'days'} you logged in {RANGE_LABELS[range]}.
       </p>

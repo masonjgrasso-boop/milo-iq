@@ -194,15 +194,20 @@ Omit<ComponentPropsWithRef<'input'>, 'size'> & { unit: string; size?: 'md' | 'lg
  * A segmented control: two or three mutually exclusive options in a tinted
  * trough. Faster to tap than a dropdown and shows every option at once.
  */
-export function Segmented<T extends string>({ value, options, onChange, className = '' }: {
+export function Segmented<T extends string>({
+  value, options, onChange, size = 'md', className = '',
+}: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
+  /** `lg` is the full-width range toggle; `md` sits inside a card. */
+  size?: 'md' | 'lg';
   className?: string;
 }) {
   return (
     <div
-      className={`grid gap-1.5 rounded-input bg-brand-wash p-1 ${className}`}
+      className={`grid gap-1.5 bg-brand-wash p-1
+        ${size === 'lg' ? 'rounded-[14px]' : 'rounded-input'} ${className}`}
       style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
     >
       {options.map((option) => {
@@ -213,8 +218,9 @@ export function Segmented<T extends string>({ value, options, onChange, classNam
             type="button"
             aria-pressed={selected}
             onClick={() => onChange(option.value)}
-            className={`h-[38px] rounded-[9px] text-sm font-bold transition
+            className={`text-sm font-bold transition
               focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand
+              ${size === 'lg' ? 'h-10 rounded-chip' : 'h-[38px] rounded-[9px]'}
               ${selected ? 'bg-surface text-brand shadow-sm' : 'bg-transparent text-ink-mute'}`}
           >
             {option.label}

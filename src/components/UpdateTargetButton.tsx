@@ -31,8 +31,8 @@ export function UpdateTargetButton({ suggested, compact = false }: {
         type="button"
         onClick={apply}
         disabled={saving}
-        className="rounded-lg border border-brand bg-brand-wash px-3 py-2 text-xs
-          font-semibold text-brand transition hover:bg-brand-pill
+        className="self-start rounded-chip bg-white/15 px-3 py-2 text-xs font-bold
+          text-white ring-1 ring-white/25 transition hover:bg-white/25
           disabled:cursor-not-allowed disabled:opacity-50"
       >
         {saving ? 'Updating…' : `Update my target to ${suggested.toLocaleString()}`}

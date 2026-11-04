@@ -188,12 +188,26 @@ export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
   );
 }
 
-function Key({ color, line = false, dashed = false, children }: {
+function Key({ color, line = false, dashed = false, hollow = false, children }: {
   color: string;
   line?: boolean;
   dashed?: boolean;
+  /** A ring rather than a fill, matching an unfilled weigh-in dot. */
+  hollow?: boolean;
   children: ReactNode;
 }) {
+  if (hollow) {
+    return (
+      <li className="flex items-center gap-1.5">
+        <span
+          aria-hidden="true"
+          className="h-2 w-2 rounded-full border-2"
+          style={{ borderColor: color }}
+        />
+        {children}
+      </li>
+    );
+  }
   return (
     <li className="flex items-center gap-1.5">
       <span
@@ -234,6 +248,7 @@ export function WeightChart({ data, unit, ticks, showTrend = false }: {
   showTrend?: boolean;
 }) {
   return (
+    <>
     <ResponsiveContainer width="100%" height={168}>
       <LineChart data={data} margin={{ top: 8, right: 2, bottom: 0, left: 2 }}>
         <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
@@ -278,6 +293,14 @@ export function WeightChart({ data, unit, ticks, showTrend = false }: {
         )}
       </LineChart>
     </ResponsiveContainer>
+
+    {showTrend && (
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-soft">
+        <Key color={CHART_COLORS.under} line>Trend</Key>
+        <Key color={CHART_COLORS.dot} hollow>Weigh-ins</Key>
+      </ul>
+    )}
+    </>
   );
 }
 

@@ -1,17 +1,17 @@
-// Maintenance calories, as one short strip at the top of Trends.
+// Maintenance calories, as the hero at the top of Trends.
 //
-// Everything below it is measured against this number, so it leads — but it is
-// a reference figure, not the story, so it stays to a title row, a line of
-// explanation, and nothing else. Before there is enough history the number is
-// the formula estimate, labelled as one with a countdown, because showing
-// nothing is worse than showing an honest approximation.
+// Everything below it is measured against this number, so it leads and it is
+// the one figure on the screen given the dark card. Before there is enough
+// history the number is the formula estimate, labelled as one with a
+// countdown, because showing nothing is worse than showing an honest
+// approximation.
 
 import type { MaintenanceResult } from '../lib/maintenance';
 import type { MaintenanceBasis } from '../lib/pace';
 import { suggestedTarget } from '../lib/targets';
 import type { UserProfile } from '../lib/types';
 import { UpdateTargetButton } from './UpdateTargetButton';
-import { Card } from './ui';
+import { Eyebrow, HeroCard } from './ui';
 
 /** Why this is still an estimate, in a few words. */
 function estimateNote(result: Extract<MaintenanceResult, { status: 'not-ready' }>): string {
@@ -34,27 +34,26 @@ export function MaintenanceBox({ result, basis, profile }: {
   const differs = suggested !== null && Math.abs(suggested - profile.calorieTarget) >= 50;
 
   return (
-    <Card className="px-4 py-3.5">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-xs font-semibold tracking-wide text-ink-mute uppercase">
-          Maintenance calories
-        </h3>
-        <p className="shrink-0 text-2xl leading-none font-bold text-ink">
-          {basis.calories.toLocaleString()}{' '}
-          <span className="text-xs font-semibold text-ink-mute">cal/day</span>
-        </p>
-      </div>
+    <HeroCard className="flex flex-col gap-1.5">
+      <Eyebrow className="text-[10px] text-brand-pale">
+        {result.status === 'ready' ? 'Your real maintenance' : 'Starting estimate'}
+      </Eyebrow>
 
-      <p className="mt-1.5 text-xs leading-snug text-ink-mute">
+      <p className="flex items-baseline gap-2">
+        <span className="display tnum text-[46px]">{basis.calories.toLocaleString()}</span>
+        <span className="text-sm opacity-80">cal / day</span>
+      </p>
+
+      <p className="text-[13px] opacity-85">
         Calculated from your logged calories and weight trend.
         {result.status === 'not-ready' && ` (${estimateNote(result)})`}
       </p>
 
       {differs && (
-        <div className="mt-2.5">
+        <div className="mt-1.5">
           <UpdateTargetButton suggested={suggested} compact />
         </div>
       )}
-    </Card>
+    </HeroCard>
   );
 }
