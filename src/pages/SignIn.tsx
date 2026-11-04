@@ -1,7 +1,5 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { enabledProviders, providerLabels, signInWith, type ProviderId } from '../lib/auth';
-import { Button } from '../components/ui';
+import { ProviderButtons } from '../components/ProviderButtons';
 
 /** The four things the app does, as the tilted glass cards on the dark panel. */
 const FEATURES = [
@@ -12,25 +10,6 @@ const FEATURES = [
 ];
 
 export function SignIn() {
-  const [busy, setBusy] = useState<ProviderId | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSignIn(id: ProviderId) {
-    setBusy(id);
-    setError(null);
-    try {
-      await signInWith(id);
-    } catch (err) {
-      const code = (err as { code?: string }).code ?? '';
-      // Closing the popup is a normal thing to do, not an error worth shouting about.
-      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
-        setError('That sign-in did not go through. Please try again.');
-      }
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col">
       {/* The dark panel, with one corner cut away into the page below it. */}
@@ -94,35 +73,12 @@ export function SignIn() {
             Milo IQ
           </h1>
           <p className="text-[17px] text-ink-soft">Track the journey.</p>
+          <Link to="/" className="text-sm font-bold text-ink-mute hover:text-brand">
+            &larr; Back
+          </Link>
         </div>
 
-        <div className="flex flex-col gap-2.5">
-          {enabledProviders.map((id) => (
-            <Button
-              key={id}
-              size="lg"
-              variant={id === 'google' ? 'primary' : 'secondary'}
-              disabled={busy !== null}
-              onClick={() => handleSignIn(id)}
-              className="gap-3"
-            >
-              <span
-                aria-hidden="true"
-                className={`flex h-6 w-6 items-center justify-center rounded-full text-sm font-black
-                  ${id === 'google' ? 'bg-surface text-brand' : 'bg-brand-wash text-brand'}`}
-              >
-                {providerLabels[id].charAt(0)}
-              </span>
-              {busy === id ? 'Opening…' : `Continue with ${providerLabels[id]}`}
-            </Button>
-          ))}
-        </div>
-
-        {error && (
-          <p role="alert" className="text-center text-sm font-semibold text-danger">
-            {error}
-          </p>
-        )}
+        <ProviderButtons />
 
         <p className="text-center text-xs leading-relaxed text-ink-faint">
           By continuing you agree to the{' '}

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './context/auth-context';
 import { Layout } from './components/Layout';
 import { SignIn } from './pages/SignIn';
+import { Landing } from './pages/Landing';
 import { Onboarding } from './pages/Onboarding';
 import { Today } from './pages/Today';
 import { More } from './pages/More';
@@ -35,15 +36,23 @@ const ExerciseDetail = lazy(() =>
 );
 
 /**
- * The signed-in app. Signed-out visitors see the sign-in page, and anyone who
- * has not finished onboarding is sent there first.
+ * The signed-in app. Signed-out visitors get the landing page, and anyone who
+ * has not finished onboarding is sent to onboarding first.
  */
 function RequireProfile() {
   const { user, profile, loading } = useAuth();
   if (loading) return <Spinner />;
-  if (!user) return <SignIn />;
+  if (!user) return <Landing />;
   if (!profile) return <Navigate to="/onboarding" replace />;
   return <Layout />;
+}
+
+/** Sign-in is its own screen now, and pointless once you are signed in. */
+function SignInRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return <Spinner />;
+  if (user) return <Navigate to="/" replace />;
+  return <SignIn />;
 }
 
 function OnboardingRoute() {
@@ -57,6 +66,7 @@ export default function App() {
   return (
     <Suspense fallback={<Spinner />}>
       <Routes>
+        <Route path="/signin" element={<SignInRoute />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/onboarding" element={<OnboardingRoute />} />
