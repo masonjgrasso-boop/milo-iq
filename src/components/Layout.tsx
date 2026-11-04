@@ -96,19 +96,26 @@ export function Layout() {
  * `eyebrow` is the small uppercase kicker above the title. `back` turns the
  * header into a sub-screen header with a return link above it.
  */
-export function Page({ title, eyebrow, subtitle, back, children }: {
+export function Page({ title, eyebrow, subtitle, back, action, children }: {
   title: string;
   eyebrow?: string;
   subtitle?: string;
   back?: ReactNode;
+  /** Controls sitting to the right of the title, like Today's day stepper. */
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="screen-top mx-auto flex max-w-md flex-col gap-4 px-5 pb-7">
       <header className="flex flex-col gap-2">
         {back}
-        {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
-        <h1 className="display text-[42px] text-ink">{title}</h1>
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
+            <h1 className="display text-[42px] text-ink">{title}</h1>
+          </div>
+          {action && <div className="flex shrink-0 gap-1.5">{action}</div>}
+        </div>
         {subtitle && <p className="text-[15px] leading-snug text-ink-soft">{subtitle}</p>}
       </header>
       {children}

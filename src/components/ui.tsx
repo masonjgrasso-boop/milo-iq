@@ -8,10 +8,27 @@ import type { ButtonHTMLAttributes, ComponentPropsWithRef, ReactNode } from 'rea
 
 /* ---------------------------------------------------------------- surfaces */
 
-/** The standard white card. Callers set their own inner spacing. */
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+/**
+ * The standard card. Callers set their own inner spacing.
+ *
+ * Only the white one is raised: the tinted tones are quieter asides, and
+ * giving them a border and a shadow too would make a screen of them look
+ * like a stack of equally loud boxes.
+ */
+const CARD_TONES = {
+  surface: 'border border-line bg-surface shadow-card',
+  cream: 'bg-cream',
+  wash: 'border border-brand-pill bg-brand-wash',
+  muted: 'bg-muted',
+};
+
+export function Card({ children, tone = 'surface', className = '' }: {
+  children: ReactNode;
+  tone?: keyof typeof CARD_TONES;
+  className?: string;
+}) {
   return (
-    <div className={`rounded-card border border-line bg-surface p-[18px] shadow-card ${className}`}>
+    <div className={`rounded-card p-[18px] ${CARD_TONES[tone]} ${className}`}>
       {children}
     </div>
   );

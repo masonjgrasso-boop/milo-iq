@@ -4,10 +4,10 @@
 // type a calorie count when you already know it. Saved foods refill the form
 // in one tap, so a repeat meal is only a grams entry away.
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { tryScaleCalories } from '../lib/food';
 import type { FoodEntry, SavedFood } from '../lib/types';
-import { Button, Card, Choice, Field, NumberInput } from './ui';
+import { Button, Card, Field, NumberInput, Segmented, TextInput } from './ui';
 
 type Mode = 'label' | 'calories';
 
@@ -17,9 +17,13 @@ interface Props {
   onSaveFood: (food: Pick<SavedFood, 'name' | 'servingGrams' | 'caloriesPerServing'>) => void;
   onUseFood: (foodId: string) => void;
   onDeleteFood: (foodId: string) => void;
+  /** What has been logged today, listed inside this card below the button. */
+  logged?: ReactNode;
 }
 
-export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFood }: Props) {
+export function FoodAdder({
+  savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFood, logged,
+}: Props) {
   const [mode, setMode] = useState<Mode>('label');
   const [name, setName] = useState('');
   const [servingGrams, setServingGrams] = useState('');
@@ -38,6 +42,7 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
   const plainValid = Number.isFinite(plain) && plain > 0;
 
   const canAdd = mode === 'label' ? computed !== null && Number(gramsEaten) > 0 : plainValid;
+  const total = mode === 'label' ? computed : plainValid ? Math.round(plain) : null;
 
   function reset() {
     setName('');
@@ -89,8 +94,8 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
   }
 
   return (
-    <Card className="space-y-4">
-      <Choice
+    <Card className="flex flex-col gap-3.5">
+      <Segmented
         value={mode}
         onChange={(next) => setMode(next)}
         options={[
@@ -100,19 +105,19 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
       />
 
       {savedFoods.length > 0 && mode === 'label' && (
-        <div>
-          <p className="mb-2 text-sm font-medium text-ink-soft">Your foods</p>
+        <div className="flex flex-col gap-2">
+          <span className="text-[13px] font-bold text-ink-soft">Your foods</span>
           <div className="flex flex-wrap gap-2">
             {savedFoods.map((food) => (
-              <span key={food.id} className="group relative">
+              <span key={food.id} className="relative">
                 <button
                   type="button"
                   onClick={() => fillFromSaved(food)}
-                  className="rounded-full border border-line-in bg-white py-1.5 pl-3 pr-7
-                    text-sm text-ink-soft transition hover:border-brand hover:bg-brand-wash"
+                  className="rounded-full border border-line-in bg-surface py-1.5 pr-7 pl-3
+                    text-sm font-semibold text-ink-soft transition hover:border-brand hover:bg-brand-wash"
                 >
                   {food.name}
-                  <span className="ml-1.5 text-xs text-ink-ghost">
+                  <span className="ml-1.5 text-xs font-normal text-ink-ghost">
                     {food.caloriesPerServing}/{food.servingGrams}g
                   </span>
                 </button>
@@ -120,7 +125,7 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
                   type="button"
                   aria-label={`Remove ${food.name}`}
                   onClick={() => onDeleteFood(food.id)}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full px-1
+                  className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-full px-1
                     text-ink-off transition hover:text-danger"
                 >
                   &times;
@@ -132,55 +137,44 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
       )}
 
       <Field label="Name">
-        <input
+        <TextInput
           value={name}
           onChange={(event) => setName(event.target.value)}
-          placeholder={mode === 'label' ? 'Greek yogurt' : 'Dinner out'}
-          className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-            outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
+          placeholder={mode === 'label' ? 'e.g. Granola' : 'e.g. Dinner out'}
         />
       </Field>
 
       {mode === 'label' ? (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Serving size (g)">
+          {/* Three numbers across: the two off the packet, then what you ate.
+              The last one is the only one that changes meal to meal, so it
+              carries the brand border. */}
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="Serving (g)">
               <NumberInput
                 value={servingGrams}
                 onChange={(event) => setServingGrams(event.target.value)}
                 placeholder="100"
+                className="px-3"
               />
             </Field>
-            <Field label="Calories per serving">
+            <Field label="Cal / serving">
               <NumberInput
                 value={caloriesPerServing}
                 onChange={(event) => setCaloriesPerServing(event.target.value)}
                 placeholder="250"
+                className="px-3"
               />
             </Field>
-          </div>
-
-          <Field label="How much did you eat? (g)">
-            <NumberInput
-              ref={gramsRef}
-              value={gramsEaten}
-              onChange={(event) => setGramsEaten(event.target.value)}
-              placeholder="150"
-            />
-          </Field>
-
-          <div
-            aria-live="polite"
-            className="rounded-xl bg-muted px-4 py-3 text-center text-ink-mute"
-          >
-            {computed !== null && Number(gramsEaten) > 0 ? (
-              <span className="text-2xl font-bold text-ink">
-                {computed.toLocaleString()}{' '}
-                <span className="text-base font-semibold text-ink-mute">cal</span>
-              </span>
-            ) : (
-              <span className="text-sm">Fill in the three numbers above</span>
-            )}
+            <Field label="Eaten (g)">
+              <NumberInput
+                ref={gramsRef}
+                value={gramsEaten}
+                onChange={(event) => setGramsEaten(event.target.value)}
+                placeholder="150"
+                className="border-brand px-3"
+              />
+            </Field>
           </div>
 
           {!fromFoodId && name.trim() && (
@@ -205,9 +199,23 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
         </Field>
       )}
 
-      <Button onClick={handleAdd} disabled={!canAdd}>
-        Add to today
+      {/* The running total lives on the button, so the sum and the action that
+          commits it are never more than a glance apart. */}
+      <Button
+        onClick={handleAdd}
+        disabled={!canAdd}
+        className="justify-between"
+      >
+        <span>Add to today</span>
+        <span
+          aria-live="polite"
+          className="tnum rounded-lg bg-white/15 px-2.5 py-1 text-sm"
+        >
+          {total === null ? '—' : `${total.toLocaleString()} cal`}
+        </span>
       </Button>
+
+      {logged}
     </Card>
   );
 }

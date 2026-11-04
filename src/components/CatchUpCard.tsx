@@ -51,7 +51,7 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
   // Nothing to undo, but days are missing: reassure and move on.
   if (!needsPlan) {
     return (
-      <Card className="border-line bg-muted">
+      <Card tone="cream">
         <h3 className="text-sm font-semibold text-ink">
           {missedDays === 1 ? 'A day without a log' : `${missedDays} days without a log`}
         </h3>
@@ -68,7 +68,7 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
   // genuinely nothing safe to trim. Saying so plainly beats inventing a cut.
   if (plan.dailyAdjustment === 0) {
     return (
-      <Card className="border-line bg-muted">
+      <Card tone="cream">
         <h3 className="text-sm font-semibold text-ink">
           {progress ?? 'One weekend has not undone your month.'}
         </h3>
@@ -82,7 +82,7 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
   }
 
   return (
-    <Card className="border-brand-pill bg-brand-wash">
+    <Card tone="wash">
       <h3 className="text-sm font-semibold text-brand">
         {progress ?? 'Still moving in the right direction.'}
       </h3>

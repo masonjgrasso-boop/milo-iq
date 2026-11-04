@@ -72,8 +72,8 @@ function detail(pace: PaceSummary, scope: PaceScope): string | null {
 }
 
 const SOURCE_NOTE: Record<MaintenanceSource, string> = {
-  measured: 'Maintenance measured from your own logs',
-  estimated: 'Maintenance is still a starting estimate',
+  measured: 'maintenance measured from your own logs',
+  estimated: 'maintenance is still a starting estimate',
 };
 
 export function PaceCard({ pace, scope, source }: {
@@ -85,17 +85,19 @@ export function PaceCard({ pace, scope, source }: {
   const behind = pace.status === 'behind' || pace.status === 'above-maintenance';
 
   return (
-    <Card>
-      <p className="text-base font-semibold text-ink">{headline(pace, scope)}</p>
-      {note && <p className="mt-1.5 text-sm text-ink-soft">{note}</p>}
+    <Card className="flex flex-col gap-3.5">
+      <div className="flex flex-col gap-1">
+        <p className="text-[17px] font-extrabold text-ink">{headline(pace, scope)}</p>
+        {note && <p className="text-sm text-ink-mute">{note}</p>}
+      </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3 border-t border-line-soft pt-3">
+      <div className="grid grid-cols-3 gap-2">
         <Stat
-          label="Below maintenance"
+          label="Below maint."
           value={`${pace.actualPerDay >= 0 ? '' : '+'}${cal(pace.actualPerDay)}`}
           tone={pace.actualPerDay > 0 ? 'good' : 'warn'}
         />
-        <Stat label="Your goal asks" value={cal(pace.targetPerDay)} />
+        <Stat label="Goal asks" value={cal(pace.targetPerDay)} />
         <Stat
           label={pace.gapPerDay > 0 ? 'Short by' : 'Ahead by'}
           value={cal(pace.gapPerDay)}
@@ -103,7 +105,7 @@ export function PaceCard({ pace, scope, source }: {
         />
       </div>
 
-      <p className="mt-2 text-xs text-ink-mute">
+      <p className="text-xs text-ink-faint">
         Calories per day, averaged across the {pace.daysLogged}{' '}
         {pace.daysLogged === 1 ? 'day' : 'days'} you logged {SCOPE_WORDS[scope]} &middot;{' '}
         {SOURCE_NOTE[source]}

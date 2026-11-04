@@ -4,18 +4,22 @@ import { useToast } from '../context/toast-context';
 import { useDay } from '../hooks/useDay';
 import { useDayRange } from '../hooks/useDayRange';
 import { deleteFood, listFoods, saveFood, touchFood } from '../data/foods';
-import { todayKey, friendlyDayLabel, addDays, startOfMonth, startOfWeek } from '../lib/dates';
+import {
+  todayKey, friendlyDayLabel, addDays, startOfMonth, startOfWeek, shortDateLabel, weekdayLabel,
+} from '../lib/dates';
 import { formatWeight, fromKg, toKg, weightUnitLabel } from '../lib/units';
 import { planCatchUpForUser } from '../lib/catchup';
 import { estimateMaintenance, MAX_WINDOW_DAYS } from '../lib/maintenance';
 import { maintenanceBasis, paceSummary } from '../lib/pace';
 import { latestTrend, trendSeries } from '../lib/trend';
 import type { SavedFood } from '../lib/types';
-import { Button, Card, NumberInput } from '../components/ui';
+import { Button, Card, Eyebrow, HeroCard, IconButton, UnitInput } from '../components/ui';
 import { FoodAdder } from '../components/FoodAdder';
 import { CatchUpCard } from '../components/CatchUpCard';
 import { PaceCard } from '../components/PaceCard';
 import { Page } from '../components/Layout';
+
+const cal = (value: number): string => Math.abs(Math.round(value)).toLocaleString();
 
 export function Today() {
   const { user, profile } = useAuth();
@@ -102,9 +106,27 @@ export function Today() {
   // The plan is built from completed days only: a day still in progress must
   // never be counted as a shortfall before dinner.
   const weekToDate = paceFor(startOfWeek(today), addDays(today, -1));
+  // Just the day on screen, for the deficit strip inside the hero.
+  const dayPace = paceFor(date, date);
 
   const catchUp = planCatchUpForUser(weekToDate.gapTotal, target, profile.sex);
   const missedDays = (recentDays ?? []).filter((past) => past.calories === 0).length;
+
+  const goalDeficit = Math.round(dayPace.targetPerDay);
+  const deficitNow = Math.round(dayPace.actualPerDay);
+  const deficitPct = goalDeficit > 0
+    ? Math.max(0, Math.min(100, Math.round((deficitNow / goalDeficit) * 100)))
+    : 0;
+
+  /** One line under the deficit bar, saying where the day stands. */
+  function deficitNote(): string {
+    if (deficitNow < 0) {
+      return 'Above maintenance so far today. One day is not the trend.';
+    }
+    if (goalDeficit <= 0) return 'Maintaining, so there is no deficit to chase.';
+    if (deficitNow >= goalDeficit) return 'That is today’s goal already covered.';
+    return `${cal(goalDeficit - deficitNow)} more to reach today’s goal.`;
+  }
 
   async function handleSaveWeight() {
     const value = Number(weightInput);
@@ -141,173 +163,188 @@ export function Today() {
   }
 
   return (
-    <Page title={friendlyDayLabel(date)}>
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => setDate(addDays(date, -1))}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-mute hover:bg-muted"
-        >
-          &larr; Previous
-        </button>
-        {!isToday && (
-          <button
-            type="button"
+    <Page
+      eyebrow={`${weekdayLabel(date)}, ${shortDateLabel(date)}`}
+      title={friendlyDayLabel(date)}
+      action={
+        <>
+          <IconButton label="Previous day" onClick={() => setDate(addDays(date, -1))}>
+            &larr;
+          </IconButton>
+          <IconButton
+            label={isToday ? 'Next day' : 'Jump to today'}
+            active={!isToday}
+            disabled={isToday}
             onClick={() => setDate(todayKey())}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-brand hover:bg-brand-wash"
           >
-            Jump to today
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setDate(addDays(date, 1))}
-          disabled={isToday}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-mute
-            hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent"
-        >
-          Next &rarr;
-        </button>
-      </div>
-
-      <Card className="border-brand-pill bg-brand-wash">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-sm font-medium text-brand">Eaten</p>
-            <p className="text-4xl font-bold text-brand">{eaten.toLocaleString()}</p>
+            &rarr;
+          </IconButton>
+        </>
+      }
+    >
+      <HeroCard className="flex flex-col gap-4">
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <Eyebrow className="text-[10px] text-brand-pale">Eaten</Eyebrow>
+            <span className="display tnum text-5xl">{eaten.toLocaleString()}</span>
           </div>
-          <div className="text-right">
-            <p className="text-sm font-medium text-brand">
+          <div className="flex flex-col items-end gap-1">
+            <Eyebrow className="text-[10px] text-brand-pale">
               {remaining >= 0 ? 'Left' : 'Over'}
-            </p>
-            <p className="text-2xl font-semibold text-brand">
+            </Eyebrow>
+            <span className="tnum text-[26px] font-extrabold">
               {Math.abs(remaining).toLocaleString()}
-            </p>
+            </span>
           </div>
         </div>
 
-        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-brand-pill">
+        <div className="h-2.5 overflow-hidden rounded-full bg-white/15">
           <div
             className={`h-full rounded-full transition-all ${
-              remaining >= 0 ? 'bg-brand' : 'bg-over'
+              remaining >= 0 ? 'bg-brand-lite' : 'bg-over'
             }`}
             style={{ width: `${percent}%` }}
           />
         </div>
-        <p className="mt-2 text-xs text-brand">
-          Target {target.toLocaleString()} cal
-          {saving && <span className="ml-2 text-brand">Saving…</span>}
-        </p>
-      </Card>
+
+        {dayPace.status === 'no-data' ? (
+          <p className="text-xs opacity-80">
+            Target {target.toLocaleString()} cal
+            {saving && <span className="ml-2">Saving…</span>}
+          </p>
+        ) : (
+          <>
+            <div aria-hidden="true" className="h-px bg-white/15" />
+            <div className="flex flex-col gap-2">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm font-bold">
+                  {isToday ? 'Today’s deficit' : 'That day’s deficit'}
+                </span>
+                <span className="text-sm">
+                  <b className="tnum text-lg">{cal(deficitNow)}</b>{' '}
+                  <span className="opacity-75">/ {cal(goalDeficit)} goal</span>
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
+                <div
+                  className="h-full rounded-full bg-white transition-all"
+                  style={{ width: `${deficitPct}%` }}
+                />
+              </div>
+              <p className="text-xs opacity-80">{deficitNote()}</p>
+            </div>
+          </>
+        )}
+      </HeroCard>
 
       {error && (
-        <p role="alert" className="mt-3 text-sm text-danger">
+        <p role="alert" className="text-sm font-semibold text-danger">
           {error}
         </p>
       )}
 
       {history && isToday && (
-        <div className="mt-4">
-          <PaceCard pace={weekPace} scope="week" source={basis.source} />
-        </div>
+        <PaceCard pace={weekPace} scope="week" source={basis.source} />
       )}
 
       {recentDays && isToday && (
-        <div className="mt-4">
-          <CatchUpCard
-            plan={catchUp}
-            week={weekToDate}
-            month={monthPace}
-            missedDays={missedDays}
-          />
-        </div>
+        <CatchUpCard
+          plan={catchUp}
+          week={weekToDate}
+          month={monthPace}
+          missedDays={missedDays}
+        />
       )}
 
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">Add food</h2>
-      <FoodAdder
-        savedFoods={foods}
-        onAdd={addEntry}
-        onSaveFood={handleSaveFood}
-        onUseFood={(foodId) => user && touchFood(user.uid, foodId)}
-        onDeleteFood={handleDeleteFood}
-      />
-
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">
-        Logged {day && day.entries.length > 0 && `(${day.entries.length})`}
-      </h2>
-      <Card>
-        {loading ? (
-          <p className="text-sm text-ink-ghost">Loading…</p>
-        ) : day && day.entries.length > 0 ? (
-          <ul className="divide-y divide-line-soft">
-            {day.entries.map((entry) => (
-              <li key={entry.id} className="flex items-center justify-between gap-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-ink">{entry.name}</p>
-                  {entry.grams !== undefined && (
-                    <p className="text-xs text-ink-mute">{entry.grams} g</p>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="font-semibold text-ink">
-                    {entry.calories.toLocaleString()}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={`Remove ${entry.name}`}
-                    onClick={() => removeEntry(entry.id)}
-                    className="rounded-lg px-2 py-1 text-ink-off transition hover:text-danger"
+      <section className="flex flex-col gap-2.5">
+        <Eyebrow>Add food</Eyebrow>
+        <FoodAdder
+          savedFoods={foods}
+          onAdd={addEntry}
+          onSaveFood={handleSaveFood}
+          onUseFood={(foodId) => user && touchFood(user.uid, foodId)}
+          onDeleteFood={handleDeleteFood}
+          logged={
+            loading ? (
+              <p className="text-sm text-ink-ghost">Loading…</p>
+            ) : day && day.entries.length > 0 ? (
+              <ul className="flex flex-col">
+                {day.entries.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex items-center justify-between gap-3 border-t border-line-soft py-2.5 text-sm"
                   >
-                    &times;
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-ink-mute">Nothing logged yet.</p>
-        )}
-      </Card>
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold text-ink">{entry.name}</span>
+                      {entry.grams !== undefined && (
+                        <span className="block text-xs text-ink-mute">{entry.grams} g</span>
+                      )}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-3">
+                      <span className="tnum text-ink-mute">
+                        {entry.calories.toLocaleString()} cal
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${entry.name}`}
+                        onClick={() => removeEntry(entry.id)}
+                        className="rounded-chip px-2 py-1 text-ink-off transition hover:text-danger"
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null
+          }
+        />
+      </section>
 
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">Weight</h2>
-      <Card>
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
-            <NumberInput
+      <section className="flex flex-col gap-2.5">
+        <Eyebrow>Morning weight</Eyebrow>
+        <Card className="flex flex-col gap-3">
+          <div className="flex gap-2.5">
+            <UnitInput
+              size="lg"
+              className="flex-1"
+              unit={weightUnitLabel(profile.units)}
               value={weightInput}
               onChange={(event) => setWeightInput(event.target.value)}
               placeholder={profile.units === 'metric' ? '80.0' : '176.0'}
               aria-label={`Weight in ${weightUnitLabel(profile.units)}`}
             />
-          </div>
-          <span className="pb-3 text-sm text-ink-mute">{weightUnitLabel(profile.units)}</span>
-          <div className="w-28">
-            <Button onClick={handleSaveWeight} disabled={!weightInput}>
-              Save
+            <Button
+              block={false}
+              onClick={handleSaveWeight}
+              disabled={!weightInput}
+              variant={day?.weightKg === undefined ? 'primary' : 'secondary'}
+              className="w-[120px] shrink-0"
+            >
+              {day?.weightKg === undefined ? 'Save' : 'Update'}
             </Button>
           </div>
-        </div>
-        {day?.weightKg === undefined ? (
-          <p className="mt-2 text-xs text-ink-mute">
-            Weigh in whenever you can. Milo IQ follows the trend, not any single day.
-          </p>
-        ) : (
-          <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-brand">
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" aria-hidden="true">
-              <path
-                d="M4 12.5l5 5L20 6.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            {formatWeight(day.weightKg, profile.units)} logged for{' '}
-            {friendlyDayLabel(date).toLowerCase()}
-          </p>
-        )}
-      </Card>
+
+          {day?.weightKg === undefined ? (
+            <p className="text-[13px] text-ink-faint">
+              Daily ups and downs are water. Milo smooths them into a trend.
+            </p>
+          ) : (
+            <p className="flex items-center gap-2.5 rounded-input bg-brand-wash px-3 py-2.5 text-sm text-brand">
+              <span
+                aria-hidden="true"
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-brand text-[13px] font-black text-white"
+              >
+                ✓
+              </span>
+              <span>
+                <b>Saved.</b> {formatWeight(day.weightKg, profile.units)} for{' '}
+                {friendlyDayLabel(date).toLowerCase()}
+              </span>
+            </p>
+          )}
+        </Card>
+      </section>
     </Page>
   );
 }
