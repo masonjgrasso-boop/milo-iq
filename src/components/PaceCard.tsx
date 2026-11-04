@@ -86,10 +86,10 @@ export function PaceCard({ pace, scope, source }: {
 
   return (
     <Card>
-      <p className="text-base font-semibold text-slate-900">{headline(pace, scope)}</p>
-      {note && <p className="mt-1.5 text-sm text-slate-600">{note}</p>}
+      <p className="text-base font-semibold text-ink">{headline(pace, scope)}</p>
+      {note && <p className="mt-1.5 text-sm text-ink-soft">{note}</p>}
 
-      <div className="mt-4 grid grid-cols-3 gap-3 border-t border-slate-100 pt-3">
+      <div className="mt-4 grid grid-cols-3 gap-3 border-t border-line-soft pt-3">
         <Stat
           label="Below maintenance"
           value={`${pace.actualPerDay >= 0 ? '' : '+'}${cal(pace.actualPerDay)}`}
@@ -103,7 +103,7 @@ export function PaceCard({ pace, scope, source }: {
         />
       </div>
 
-      <p className="mt-2 text-xs text-slate-500">
+      <p className="mt-2 text-xs text-ink-mute">
         Calories per day, averaged across the {pace.daysLogged}{' '}
         {pace.daysLogged === 1 ? 'day' : 'days'} you logged {SCOPE_WORDS[scope]} &middot;{' '}
         {SOURCE_NOTE[source]}

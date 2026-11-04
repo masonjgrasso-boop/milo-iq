@@ -79,13 +79,13 @@ export function DeficitSummaryCard({ pace, range, sex }: {
         />
       </div>
 
-      <p className="mt-3 text-sm text-slate-600">
+      <p className="mt-3 text-sm text-ink-soft">
         {verdict(pace, plan, safeMinimum, pace.targetCalories)}
       </p>
 
       {/* The maintenance figure itself is named in the box above, so this says
           only what the numbers are measured over. */}
-      <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
+      <p className="mt-3 border-t border-line-soft pt-3 text-xs text-ink-mute">
         Calories per day against maintenance, across the {pace.daysLogged}{' '}
         {pace.daysLogged === 1 ? 'day' : 'days'} you logged in {RANGE_LABELS[range]}.
       </p>

@@ -70,7 +70,7 @@ export function RoutineEditor() {
     return (
       <Page title="Loading…">
         <Card>
-          <p className="text-sm text-slate-400">One moment…</p>
+          <p className="text-sm text-ink-ghost">One moment…</p>
         </Card>
       </Page>
     );
@@ -79,12 +79,12 @@ export function RoutineEditor() {
   if (failed) {
     return (
       <Page title="Could not load">
-        <Card className="border-red-200 bg-red-50">
-          <p className="text-sm text-red-800">
+        <Card className="border-cream-line bg-cream">
+          <p className="text-sm text-danger">
             That workout day would not load — usually the connection rather than anything
             you did. Nothing has been lost.
           </p>
-          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-red-800">
+          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-danger">
             Back to workouts
           </Link>
         </Card>
@@ -96,8 +96,8 @@ export function RoutineEditor() {
     return (
       <Page title="Not found">
         <Card>
-          <p className="text-sm text-slate-600">That workout day no longer exists.</p>
-          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-brand-600">
+          <p className="text-sm text-ink-soft">That workout day no longer exists.</p>
+          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-brand">
             Back to workouts
           </Link>
         </Card>
@@ -128,14 +128,14 @@ export function RoutineEditor() {
     <Page title={routine.name}>
       <Link
         to="/lift"
-        className="mb-4 inline-block text-sm font-medium text-slate-500 hover:text-slate-700"
+        className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
       >
         &larr; Workouts
       </Link>
 
       <Card>
         <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-slate-700">Day name</span>
+          <span className="mb-1.5 block text-sm font-medium text-ink-soft">Day name</span>
           <input
             value={routine.name}
             onChange={(event) => setRoutine({ ...routine, name: event.target.value })}
@@ -143,22 +143,22 @@ export function RoutineEditor() {
               const next = event.target.value.trim();
               if (next && next !== routine.name) commit({ name: next });
             }}
-            className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-              outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+            className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+              outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
           />
         </label>
       </Card>
 
       <div className="mt-6 mb-2 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">Exercises</h2>
+        <h2 className="text-sm font-semibold text-ink">Exercises</h2>
         {slots.length > 0 && (
-          <span className="text-xs text-slate-500">{plannedSetCount(slots)} sets planned</span>
+          <span className="text-xs text-ink-mute">{plannedSetCount(slots)} sets planned</span>
         )}
       </div>
 
       {slots.length === 0 ? (
         <Card>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-ink-soft">
             Nothing here yet. Add the exercises you run on this day, with the sets and reps
             you plan to hit.
           </p>
@@ -224,8 +224,8 @@ export function RoutineEditor() {
         <div className="mt-6">
           <Link
             to={`/lift/do/${routine.id}`}
-            className="block w-full rounded-xl bg-brand-600 px-4 py-3 text-center text-base
-              font-semibold text-white hover:bg-brand-700"
+            className="block w-full rounded-xl bg-brand px-4 py-3 text-center text-base
+              font-semibold text-white hover:bg-brand-hi"
           >
             Start this workout
           </Link>
@@ -234,8 +234,8 @@ export function RoutineEditor() {
 
       <div className="mt-8">
         {confirmDelete ? (
-          <Card className="border-red-200 bg-red-50">
-            <p className="text-sm text-red-800">
+          <Card className="border-cream-line bg-cream">
+            <p className="text-sm text-danger">
               Delete <strong>{routine.name}</strong>? Your logged sets are kept — only the
               plan goes.
             </p>
@@ -245,7 +245,7 @@ export function RoutineEditor() {
               </Button>
               <Button
                 onClick={handleDelete}
-                className="bg-red-600 hover:bg-red-700 active:bg-red-700"
+                className="bg-danger hover:bg-danger active:bg-danger"
               >
                 Delete
               </Button>
@@ -255,7 +255,7 @@ export function RoutineEditor() {
           <button
             type="button"
             onClick={() => setConfirmDelete(true)}
-            className="w-full py-3 text-sm font-medium text-slate-500 hover:text-red-700"
+            className="w-full py-3 text-sm font-medium text-ink-mute hover:text-danger"
           >
             Delete this workout day
           </button>
@@ -275,13 +275,13 @@ function SlotRow({ slot, handle, dragging, onChange, onRemove }: {
   return (
     <div
       className={`rounded-2xl border bg-white px-3 py-3 shadow-sm transition
-        ${dragging ? 'border-brand-400 shadow-md' : 'border-slate-200'}`}
+        ${dragging ? 'border-brand shadow-md' : 'border-line'}`}
     >
       <div className="flex items-center gap-1">
         <DragHandle handle={handle} label={slot.name} />
         <Link
           to={`/lift/exercise/${slot.exerciseId}`}
-          className="min-w-0 flex-1 truncate font-medium text-slate-900 hover:text-brand-700"
+          className="min-w-0 flex-1 truncate font-medium text-ink hover:text-brand"
         >
           {slot.name}
         </Link>
@@ -290,7 +290,7 @@ function SlotRow({ slot, handle, dragging, onChange, onRemove }: {
           onClick={onRemove}
           aria-label={`Remove ${slot.name}`}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg
-            text-xl text-slate-400 hover:bg-slate-50 hover:text-red-600"
+            text-xl text-ink-ghost hover:bg-muted hover:text-danger"
         >
           &times;
         </button>
@@ -300,7 +300,7 @@ function SlotRow({ slot, handle, dragging, onChange, onRemove }: {
           the gym rather than planned here. */}
       <div className="mt-2 flex items-center gap-3 pl-8">
         <label className="flex items-center gap-3">
-          <span className="text-xs font-medium text-slate-500">Sets</span>
+          <span className="text-xs font-medium text-ink-mute">Sets</span>
           <span className="w-20">
             <NumberInput
               value={String(slot.sets)}

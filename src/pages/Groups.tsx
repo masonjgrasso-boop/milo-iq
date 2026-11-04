@@ -71,18 +71,18 @@ export function Groups() {
     <Page title="Groups" subtitle="Share only what you choose. Leave whenever you like.">
       <Link
         to="/more"
-        className="mb-4 inline-block text-sm font-medium text-slate-500 hover:text-slate-700"
+        className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
       >
         &larr; Back
       </Link>
 
       {groups === null ? (
         <Card>
-          <p className="text-sm text-slate-400">Loading…</p>
+          <p className="text-sm text-ink-ghost">Loading…</p>
         </Card>
       ) : groups.length === 0 ? (
         <Card>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-ink-soft">
             You are not in any groups. A group is a handful of people who can see whichever
             parts of your progress you decide to share — nothing is shared by default.
           </p>
@@ -93,18 +93,18 @@ export function Groups() {
             <Link
               key={membership.groupId}
               to={`/groups/${membership.groupId}`}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200
-                bg-white px-4 py-3 shadow-sm transition hover:border-brand-400"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-line
+                bg-white px-4 py-3 shadow-sm transition hover:border-brand"
             >
               <span className="min-w-0">
-                <span className="block truncate font-medium text-slate-900">
+                <span className="block truncate font-medium text-ink">
                   {membership.name}
                 </span>
                 {membership.role === 'coach' && (
-                  <span className="block text-xs font-medium text-brand-600">Coach</span>
+                  <span className="block text-xs font-medium text-brand">Coach</span>
                 )}
               </span>
-              <span aria-hidden="true" className="shrink-0 text-slate-400">
+              <span aria-hidden="true" className="shrink-0 text-ink-ghost">
                 &rarr;
               </span>
             </Link>
@@ -113,7 +113,7 @@ export function Groups() {
       )}
 
       {error && (
-        <p role="alert" className="mt-3 text-sm text-red-600">
+        <p role="alert" className="mt-3 text-sm text-danger">
           {error}
         </p>
       )}
@@ -126,20 +126,20 @@ export function Groups() {
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Thursday lifting crew"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-                  outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+                  outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />
             </Field>
-            <label className="flex items-start gap-2.5 text-sm text-slate-600">
+            <label className="flex items-start gap-2.5 text-sm text-ink-soft">
               <input
                 type="checkbox"
                 checked={asCoach}
                 onChange={(event) => setAsCoach(event.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-brand-600"
+                className="mt-0.5 h-4 w-4 rounded border-line-in accent-brand"
               />
               <span>
                 I am coaching this group
-                <span className="block text-xs text-slate-500">
+                <span className="block text-xs text-ink-mute">
                   Coaches can leave notes on each member&rsquo;s shared data.
                 </span>
               </span>
@@ -164,9 +164,9 @@ export function Groups() {
                 placeholder="AB3K9P"
                 maxLength={8}
                 autoCapitalize="characters"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-center
-                  font-mono text-lg tracking-widest text-slate-900 outline-none
-                  focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-center
+                  font-mono text-lg tracking-widest text-ink outline-none
+                  focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />
             </Field>
             <div className="flex gap-3">

@@ -67,14 +67,14 @@ export function Account() {
     <Page title="Your data">
       <Link
         to="/more"
-        className="mb-4 inline-block text-sm font-medium text-slate-500 hover:text-slate-700"
+        className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
       >
         &larr; Back
       </Link>
 
       <Card>
-        <h2 className="text-sm font-semibold text-slate-900">Export everything</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <h2 className="text-sm font-semibold text-ink">Export everything</h2>
+        <p className="mt-2 text-sm text-ink-soft">
           Your logs, weights, foods, rules, workouts and photo records. It is your data;
           take a copy whenever you like.
         </p>
@@ -86,32 +86,32 @@ export function Account() {
             {busy === 'csv' ? 'Preparing…' : 'Download CSV'}
           </Button>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-ink-mute">
           CSV downloads as three files: days, workouts and foods.
         </p>
       </Card>
 
-      <Card className="mt-4 border-red-200">
-        <h2 className="text-sm font-semibold text-red-900">Delete your account</h2>
-        <p className="mt-2 text-sm text-slate-600">
+      <Card className="mt-4 border-cream-line">
+        <h2 className="text-sm font-semibold text-danger">Delete your account</h2>
+        <p className="mt-2 text-sm text-ink-soft">
           This removes every log, weight, workout, rule and photo, takes you out of any
           groups you are in, and closes your account. It cannot be undone, and we cannot
           recover it for you afterwards.
         </p>
-        <p className="mt-2 text-sm font-medium text-slate-700">
+        <p className="mt-2 text-sm font-medium text-ink-soft">
           Export your data first if you might want it.
         </p>
 
         <label className="mt-4 block">
-          <span className="mb-1.5 block text-sm text-slate-600">
+          <span className="mb-1.5 block text-sm text-ink-soft">
             Type <strong>DELETE</strong> to confirm
           </span>
           <input
             value={confirmText}
             onChange={(event) => setConfirmText(event.target.value)}
             placeholder="DELETE"
-            className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-              outline-none focus:border-red-500 focus:ring-2 focus:ring-red-200"
+            className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+              outline-none focus:border-danger focus:ring-2 focus:ring-cream-line"
           />
         </label>
 
@@ -119,24 +119,24 @@ export function Account() {
           type="button"
           onClick={handleDelete}
           disabled={confirmText !== 'DELETE' || busy !== null}
-          className="mt-3 w-full rounded-xl bg-red-600 px-4 py-3 text-base font-semibold
-            text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-3 w-full rounded-xl bg-danger px-4 py-3 text-base font-semibold
+            text-white transition hover:bg-danger disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy === 'delete' ? (step ?? 'Deleting…') : 'Delete my account permanently'}
         </button>
       </Card>
 
       {error && (
-        <p role="alert" className="mt-3 text-sm text-red-600">
+        <p role="alert" className="mt-3 text-sm text-danger">
           {error}
         </p>
       )}
 
       <div className="mt-8 flex justify-center gap-6 text-sm">
-        <Link to="/privacy" className="font-medium text-slate-500 hover:text-slate-700">
+        <Link to="/privacy" className="font-medium text-ink-mute hover:text-ink-soft">
           Privacy
         </Link>
-        <Link to="/terms" className="font-medium text-slate-500 hover:text-slate-700">
+        <Link to="/terms" className="font-medium text-ink-mute hover:text-ink-soft">
           Terms
         </Link>
       </div>

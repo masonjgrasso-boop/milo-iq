@@ -102,21 +102,21 @@ export function Photos() {
               ? 'Replace this week’s photo'
               : 'Add this week’s photo'}
         </Button>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-ink-mute">
           Compressed on your device to about 200 KB before anything is uploaded. One photo
           per week — a second upload replaces the first.
         </p>
       </Card>
 
       {error && (
-        <p role="alert" className="mt-3 text-sm text-red-600">
+        <p role="alert" className="mt-3 text-sm text-danger">
           {error}
         </p>
       )}
 
       {comparing.length === 2 && (
         <>
-          <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Side by side</h2>
+          <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">Side by side</h2>
           <Card>
             <div className="grid grid-cols-2 gap-3">
               {comparing.map((photo) => (
@@ -127,7 +127,7 @@ export function Photos() {
                     className="aspect-[3/4] w-full rounded-xl object-cover"
                     loading="lazy"
                   />
-                  <figcaption className="mt-1.5 text-center text-xs text-slate-500">
+                  <figcaption className="mt-1.5 text-center text-xs text-ink-mute">
                     {weekKeyLabel(photo.week)}
                   </figcaption>
                 </figure>
@@ -136,7 +136,7 @@ export function Photos() {
             <button
               type="button"
               onClick={() => setCompare([])}
-              className="mt-3 w-full text-sm font-medium text-slate-500 hover:text-slate-700"
+              className="mt-3 w-full text-sm font-medium text-ink-mute hover:text-ink-soft"
             >
               Clear comparison
             </button>
@@ -144,21 +144,21 @@ export function Photos() {
         </>
       )}
 
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Timeline</h2>
+      <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">Timeline</h2>
       {photos === null ? (
         <Card>
-          <p className="text-sm text-slate-400">Loading…</p>
+          <p className="text-sm text-ink-ghost">Loading…</p>
         </Card>
       ) : photos.length === 0 ? (
         <Card>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-ink-soft">
             No photos yet. Weekly photos show change that the scale misses entirely —
             especially in the weeks where the number refuses to move.
           </p>
         </Card>
       ) : (
         <>
-          <p className="mb-2 text-xs text-slate-500">
+          <p className="mb-2 text-xs text-ink-mute">
             Tap a photo to view it full size, or use Compare on any two weeks.
           </p>
           <div className="grid grid-cols-3 gap-2">
@@ -175,12 +175,12 @@ export function Photos() {
                       src={photo.thumbUrl}
                       alt={`Progress photo from ${weekKeyLabel(photo.week)}`}
                       className={`aspect-[3/4] w-full rounded-xl object-cover transition ${
-                        selected ? 'ring-2 ring-brand-600' : ''
+                        selected ? 'ring-2 ring-brand' : ''
                       }`}
                       loading="lazy"
                     />
                   </button>
-                  <p className="mt-1 text-center text-[11px] text-slate-500">
+                  <p className="mt-1 text-center text-[11px] text-ink-mute">
                     {weekKeyLabel(photo.week)}
                   </p>
                   <button
@@ -188,8 +188,8 @@ export function Photos() {
                     onClick={() => toggleCompare(photo.week)}
                     className={`mt-0.5 w-full rounded-lg py-1 text-[11px] font-medium transition ${
                       selected
-                        ? 'bg-brand-600 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        ? 'bg-brand text-white'
+                        : 'bg-muted text-ink-soft hover:bg-line-in'
                     }`}
                   >
                     {selected ? 'Selected' : 'Compare'}
@@ -203,7 +203,7 @@ export function Photos() {
 
       {viewing && (
         <div
-          className="fixed inset-0 z-20 flex flex-col bg-slate-900/95 p-4"
+          className="fixed inset-0 z-20 flex flex-col bg-ink/95 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Progress photo"
@@ -223,7 +223,7 @@ export function Photos() {
             alt={`Progress photo from ${weekKeyLabel(viewing.week)}`}
             className="mt-3 min-h-0 flex-1 rounded-xl object-contain"
           />
-          <div className="mt-3 flex items-center justify-between text-xs text-slate-300">
+          <div className="mt-3 flex items-center justify-between text-xs text-ink-off">
             <span>{formatBytes(viewing.bytes)}</span>
             <button
               type="button"
@@ -231,7 +231,7 @@ export function Photos() {
                 handleDelete(viewing.week);
                 setViewing(null);
               }}
-              className="rounded-lg px-3 py-1.5 font-medium text-red-300 hover:bg-white/10"
+              className="rounded-lg px-3 py-1.5 font-medium text-cream-line hover:bg-white/10"
             >
               Delete
             </button>

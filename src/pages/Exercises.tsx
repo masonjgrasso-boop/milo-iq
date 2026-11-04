@@ -63,7 +63,7 @@ export function Exercises() {
     <Page title="All exercises" subtitle="More weight or more reps — both count as progress.">
       <Link
         to="/lift"
-        className="mb-4 inline-block text-sm font-medium text-slate-500 hover:text-slate-700"
+        className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
       >
         &larr; Workouts
       </Link>
@@ -73,17 +73,17 @@ export function Exercises() {
         onChange={(event) => setSearch(event.target.value)}
         placeholder="Search exercises"
         aria-label="Search exercises"
-        className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-          outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+        className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+          outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
       />
 
       {exercises === null ? (
-        <p className="mt-6 text-center text-sm text-slate-400">Loading…</p>
+        <p className="mt-6 text-center text-sm text-ink-ghost">Loading…</p>
       ) : (
         <>
           {recent.length > 0 && (
             <>
-              <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Recent</h2>
+              <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">Recent</h2>
               <div className="space-y-2">
                 {recent.map((exercise) => (
                   <ExerciseRow key={exercise.id} exercise={exercise} unit={unit} profileUnits={profile.units} />
@@ -92,7 +92,7 @@ export function Exercises() {
             </>
           )}
 
-          <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">
+          <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">
             {recent.length > 0 ? 'All exercises' : 'Exercises'}
           </h2>
           <div className="space-y-2">
@@ -102,7 +102,7 @@ export function Exercises() {
           </div>
 
           {filtered.length === 0 && (
-            <p className="mt-4 text-center text-sm text-slate-500">
+            <p className="mt-4 text-center text-sm text-ink-mute">
               Nothing matches &ldquo;{search}&rdquo;.
             </p>
           )}
@@ -117,8 +117,8 @@ export function Exercises() {
                 value={newName}
                 onChange={(event) => setNewName(event.target.value)}
                 placeholder="Sled push"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-                  outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+                  outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />
             </Field>
             <div className="flex gap-3">
@@ -148,13 +148,13 @@ function ExerciseRow({ exercise, unit, profileUnits }: {
   return (
     <Link
       to={`/lift/exercise/${exercise.id}`}
-      className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200
-        bg-white px-4 py-3 shadow-sm transition hover:border-brand-400"
+      className="flex items-center justify-between gap-3 rounded-2xl border border-line
+        bg-white px-4 py-3 shadow-sm transition hover:border-brand"
     >
       <span className="min-w-0">
-        <span className="block truncate font-medium text-slate-900">{exercise.name}</span>
+        <span className="block truncate font-medium text-ink">{exercise.name}</span>
         {exercise.lastDate && (
-          <span className="block text-xs text-slate-500">
+          <span className="block text-xs text-ink-mute">
             {friendlyDayLabel(exercise.lastDate)}
             {exercise.bestE1rmKg
               ? ` · best ${fromKg(exercise.bestE1rmKg, profileUnits).toFixed(0)} ${unit}`
@@ -162,7 +162,7 @@ function ExerciseRow({ exercise, unit, profileUnits }: {
           </span>
         )}
       </span>
-      <span aria-hidden="true" className="shrink-0 text-slate-400">
+      <span aria-hidden="true" className="shrink-0 text-ink-ghost">
         &rarr;
       </span>
     </Link>

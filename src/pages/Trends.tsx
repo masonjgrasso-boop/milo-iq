@@ -193,7 +193,7 @@ function Body({
   if (loading) {
     return (
       <Card className="mt-4">
-        <p className="py-16 text-center text-sm text-slate-400">Loading…</p>
+        <p className="py-16 text-center text-sm text-ink-ghost">Loading…</p>
       </Card>
     );
   }
@@ -209,14 +209,14 @@ function Body({
       {/* Nothing logged at all: one friendly line beats a graph full of zeros. */}
       {pace.daysLogged === 0 ? (
         <Card className="mt-4">
-          <p className="py-12 text-center text-sm text-slate-600">
+          <p className="py-12 text-center text-sm text-ink-soft">
             Log a few days to see your trend.
           </p>
         </Card>
       ) : (
         <>
           <Card className="mt-4">
-            <p className="text-sm font-medium text-slate-700">
+            <p className="text-sm font-medium text-ink-soft">
               {weightLine(weightChangeKg, range, profile)}
             </p>
             {weightChangeKg !== null && (

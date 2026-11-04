@@ -16,9 +16,9 @@ const BLURB =
   'maintenance calories. No guesswork. The more you log over time, the more accurate it gets.';
 
 const CONFIDENCE_STYLES = {
-  low: 'bg-slate-100 text-slate-600',
-  medium: 'bg-amber-100 text-amber-700',
-  high: 'bg-brand-100 text-brand-700',
+  low: 'bg-muted text-ink-soft',
+  medium: 'bg-cream text-over',
+  high: 'bg-brand-pill text-brand',
 } as const;
 
 export function MaintenanceCard({ result, latestWeightKg }: {
@@ -46,26 +46,26 @@ export function MaintenanceCard({ result, latestWeightKg }: {
     return (
       <Card>
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-sm font-semibold text-slate-900">Your real maintenance</h3>
-          <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+          <h3 className="text-sm font-semibold text-ink">Your real maintenance</h3>
+          <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-ink-soft">
             Starting estimate
           </span>
         </div>
 
-        <p className="mt-2 text-4xl font-bold text-slate-900">
+        <p className="mt-2 text-4xl font-bold text-ink">
           {estimate.toLocaleString()}{' '}
-          <span className="text-lg font-semibold text-slate-500">cal/day</span>
+          <span className="text-lg font-semibold text-ink-mute">cal/day</span>
         </p>
 
-        <p className="mt-2 text-sm text-slate-600">{BLURB}</p>
-        <p className="mt-2 text-sm font-medium text-slate-700">
+        <p className="mt-2 text-sm text-ink-soft">{BLURB}</p>
+        <p className="mt-2 text-sm font-medium text-ink-soft">
           This is the formula estimate from your height, weight, age and activity. {message}
         </p>
 
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-brand-500" style={{ width: `${progress}%` }} />
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-brand-mid" style={{ width: `${progress}%` }} />
         </div>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-ink-mute">
           {result.daysLogged} of {MIN_DAYS} days logged &middot; {result.weighIns} weigh-ins
         </p>
       </Card>
@@ -79,7 +79,7 @@ export function MaintenanceCard({ result, latestWeightKg }: {
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-semibold text-slate-900">Your real maintenance</h3>
+        <h3 className="text-sm font-semibold text-ink">Your real maintenance</h3>
         <span
           className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
             CONFIDENCE_STYLES[result.confidence]
@@ -89,20 +89,20 @@ export function MaintenanceCard({ result, latestWeightKg }: {
         </span>
       </div>
 
-      <p className="mt-2 text-4xl font-bold text-slate-900">
+      <p className="mt-2 text-4xl font-bold text-ink">
         {result.maintenanceCalories.toLocaleString()}{' '}
-        <span className="text-lg font-semibold text-slate-500">cal/day</span>
+        <span className="text-lg font-semibold text-ink-mute">cal/day</span>
       </p>
 
-      <p className="mt-2 text-sm text-slate-600">{BLURB}</p>
+      <p className="mt-2 text-sm text-ink-soft">{BLURB}</p>
 
-      <p className="mt-1.5 text-xs text-slate-500">
+      <p className="mt-1.5 text-xs text-ink-mute">
         Measured from {result.daysLogged} days of logs and {result.weighIns} weigh-ins.
       </p>
 
       {differs && (
-        <div className="mt-4 rounded-xl bg-brand-50 p-3">
-          <p className="text-sm text-brand-700">
+        <div className="mt-4 rounded-xl bg-brand-wash p-3">
+          <p className="text-sm text-brand">
             Based on this, a target of <strong>{suggested.toLocaleString()} cal</strong> fits
             your goal better than your current {profile.calorieTarget.toLocaleString()}.
           </p>

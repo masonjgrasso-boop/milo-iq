@@ -19,7 +19,7 @@ export function More() {
   return (
     <Page title="More">
       <Card>
-        <h2 className="text-sm font-semibold text-slate-900">Your profile</h2>
+        <h2 className="text-sm font-semibold text-ink">Your profile</h2>
         <dl className="mt-3 space-y-2 text-sm">
           <Row label="Signed in as" value={user?.email ?? user?.displayName ?? '—'} />
           <Row label="Goal" value={GOAL_LABELS[profile.goal]} />
@@ -34,36 +34,36 @@ export function More() {
       <Card className="mt-4">
         <Link to="/maintenance" className="flex items-center justify-between">
           <span>
-            <span className="block text-sm font-semibold text-slate-900">Maintenance</span>
-            <span className="block text-xs text-slate-500">
+            <span className="block text-sm font-semibold text-ink">Maintenance</span>
+            <span className="block text-xs text-ink-mute">
               What your body actually burns, measured from your own logs
             </span>
           </span>
-          <span aria-hidden="true" className="text-slate-400">&rarr;</span>
+          <span aria-hidden="true" className="text-ink-ghost">&rarr;</span>
         </Link>
       </Card>
 
       <Card className="mt-3">
         <Link to="/groups" className="flex items-center justify-between">
           <span>
-            <span className="block text-sm font-semibold text-slate-900">Groups</span>
-            <span className="block text-xs text-slate-500">
+            <span className="block text-sm font-semibold text-ink">Groups</span>
+            <span className="block text-xs text-ink-mute">
               Share only what you choose, with people you choose
             </span>
           </span>
-          <span aria-hidden="true" className="text-slate-400">&rarr;</span>
+          <span aria-hidden="true" className="text-ink-ghost">&rarr;</span>
         </Link>
       </Card>
 
       <Card className="mt-3">
         <Link to="/account" className="flex items-center justify-between">
           <span>
-            <span className="block text-sm font-semibold text-slate-900">Your data</span>
-            <span className="block text-xs text-slate-500">
+            <span className="block text-sm font-semibold text-ink">Your data</span>
+            <span className="block text-xs text-ink-mute">
               Export everything, or delete your account
             </span>
           </span>
-          <span aria-hidden="true" className="text-slate-400">&rarr;</span>
+          <span aria-hidden="true" className="text-ink-ghost">&rarr;</span>
         </Link>
       </Card>
 
@@ -73,10 +73,10 @@ export function More() {
         </Button>
       </div>
       <p className="mt-6 flex justify-center gap-6 text-sm">
-        <Link to="/privacy" className="font-medium text-slate-500 hover:text-slate-700">
+        <Link to="/privacy" className="font-medium text-ink-mute hover:text-ink-soft">
           Privacy
         </Link>
-        <Link to="/terms" className="font-medium text-slate-500 hover:text-slate-700">
+        <Link to="/terms" className="font-medium text-ink-mute hover:text-ink-soft">
           Terms
         </Link>
       </p>
@@ -87,8 +87,8 @@ export function More() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="shrink-0 text-slate-500">{label}</dt>
-      <dd className="truncate font-medium text-slate-900">{value}</dd>
+      <dt className="shrink-0 text-ink-mute">{label}</dt>
+      <dd className="truncate font-medium text-ink">{value}</dd>
     </div>
   );
 }

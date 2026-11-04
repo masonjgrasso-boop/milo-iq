@@ -61,18 +61,18 @@ export function Rules() {
   return (
     <Page title="Rules" subtitle={friendlyDayLabel(today)}>
       {failed ? (
-        <Card className="border-red-200 bg-red-50">
-          <p className="text-sm text-red-800">
+        <Card className="border-cream-line bg-cream">
+          <p className="text-sm text-danger">
             Your rules would not load — that is usually the connection. Nothing has been
             lost; reload to try again.
           </p>
         </Card>
       ) : rules === null ? (
-        <p className="mt-6 text-center text-sm text-slate-400">Loading…</p>
+        <p className="mt-6 text-center text-sm text-ink-ghost">Loading…</p>
       ) : (
         <>
           {todo.length > 0 && (
-            <p className="mb-3 text-sm font-medium text-slate-600">
+            <p className="mb-3 text-sm font-medium text-ink-soft">
               {done === todo.length
                 ? `All ${todo.length} done today. ${encouragement(todo.length)}`
                 : `${done} of ${todo.length} done today.`}
@@ -93,8 +93,8 @@ export function Rules() {
       <div className="mt-6">
         <Link
           to="/rules/edit"
-          className="block w-full rounded-xl border border-slate-300 bg-white px-4 py-3
-            text-center text-base font-semibold text-slate-700 hover:bg-slate-50"
+          className="block w-full rounded-xl border border-line-in bg-white px-4 py-3
+            text-center text-base font-semibold text-ink-soft hover:bg-muted"
         >
           Edit rules
         </Link>

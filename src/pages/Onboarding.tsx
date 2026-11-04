@@ -79,8 +79,8 @@ export function Onboarding() {
 
   return (
     <div className="mx-auto max-w-md px-5 py-8">
-      <h1 className="text-2xl font-bold text-slate-900">Let&rsquo;s set you up</h1>
-      <p className="mt-1 text-slate-600">
+      <h1 className="text-2xl font-bold text-ink">Let&rsquo;s set you up</h1>
+      <p className="mt-1 text-ink-soft">
         A few quick answers. You can change any of them later.
       </p>
 
@@ -193,14 +193,14 @@ export function Onboarding() {
         </Card>
 
         {preview && (
-          <Card className="border-brand-200 bg-brand-50">
-            <p className="text-sm font-medium text-brand-700">Your starting daily target</p>
-            <p className="mt-1 text-3xl font-bold text-brand-700">
+          <Card className="border-brand-pill bg-brand-wash">
+            <p className="text-sm font-medium text-brand">Your starting daily target</p>
+            <p className="mt-1 text-3xl font-bold text-brand">
               {preview.calorieTarget.toLocaleString()}{' '}
               <span className="text-lg font-semibold">cal</span>
             </p>
             {preview.clampedToFloor && (
-              <p className="mt-2 text-sm text-brand-700">
+              <p className="mt-2 text-sm text-brand">
                 That rate would push you below a safe intake, so your target is set at the
                 floor instead. A slower rate will feel much better.
               </p>
@@ -209,7 +209,7 @@ export function Onboarding() {
         )}
 
         {error && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-sm text-danger">
             {error}
           </p>
         )}
@@ -219,7 +219,7 @@ export function Onboarding() {
         </Button>
 
         {!valid && (
-          <p className="text-center text-xs text-slate-500">
+          <p className="text-center text-xs text-ink-mute">
             Fill in your height, weight and age to continue.
           </p>
         )}

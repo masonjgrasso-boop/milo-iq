@@ -255,8 +255,8 @@ function Runner({ routineId, uid, profile }: {
   if (failed || libraryFailed) {
     return (
       <Page title="Could not load">
-        <Card className="border-red-200 bg-red-50">
-          <p className="text-sm text-red-800">
+        <Card className="border-cream-line bg-cream">
+          <p className="text-sm text-danger">
             Your workout would not load. That is almost always the connection rather than
             anything you did — nothing has been lost.
           </p>
@@ -271,7 +271,7 @@ function Runner({ routineId, uid, profile }: {
               Try again
             </Button>
           </div>
-          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-red-800">
+          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-danger">
             Back to workouts
           </Link>
         </Card>
@@ -283,7 +283,7 @@ function Runner({ routineId, uid, profile }: {
     return (
       <Page title="Loading…">
         <Card>
-          <p className="text-sm text-slate-400">Setting up your workout…</p>
+          <p className="text-sm text-ink-ghost">Setting up your workout…</p>
         </Card>
       </Page>
     );
@@ -293,8 +293,8 @@ function Runner({ routineId, uid, profile }: {
     return (
       <Page title="Not found">
         <Card>
-          <p className="text-sm text-slate-600">That workout day no longer exists.</p>
-          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-brand-600">
+          <p className="text-sm text-ink-soft">That workout day no longer exists.</p>
+          <Link to="/lift" className="mt-3 inline-block text-sm font-semibold text-brand">
             Back to workouts
           </Link>
         </Card>
@@ -310,16 +310,16 @@ function Runner({ routineId, uid, profile }: {
     <Page title={routine.name} subtitle={friendlyDayLabel(date)}>
       <Link
         to="/lift"
-        className="mb-4 inline-block text-sm font-medium text-slate-500 hover:text-slate-700"
+        className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
       >
         &larr; Workouts
       </Link>
 
       {slots.length === 0 ? (
         <Card>
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-ink-soft">
             This day has no exercises yet.{' '}
-            <Link to={`/lift/day/${routine.id}`} className="font-semibold text-brand-600">
+            <Link to={`/lift/day/${routine.id}`} className="font-semibold text-brand">
               Add some
             </Link>{' '}
             and it will be laid out here.
@@ -379,8 +379,8 @@ function Runner({ routineId, uid, profile }: {
       </div>
 
       {changedFromRoutine && !picking && (
-        <Card className="mt-4 border-brand-200 bg-brand-50">
-          <p className="text-sm text-brand-800">
+        <Card className="mt-4 border-brand-pill bg-brand-wash">
+          <p className="text-sm text-brand">
             Today&rsquo;s line-up is different from your routine. Keep it for today only, or
             make it the plan from now on.
           </p>
@@ -466,24 +466,24 @@ function ExerciseCard({
         <div className="min-w-0">
           <Link
             to={`/lift/exercise/${slot.exerciseId}`}
-            className="block truncate font-semibold text-slate-900 hover:text-brand-700"
+            className="block truncate font-semibold text-ink hover:text-brand"
           >
             {slot.name}
           </Link>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-ink-mute">
             {lastLine ? `Last time: ${lastLine} ${unit}` : 'First time — set the bar'}
           </p>
         </div>
         {slot.adHoc && (
-          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs
-            font-medium text-slate-600">
+          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs
+            font-medium text-ink-soft">
             Today only
           </span>
         )}
       </div>
 
       <div className="mt-3 space-y-2">
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+        <div className="flex items-center gap-2 text-xs font-medium text-ink-mute">
           <span className="w-6">#</span>
           <span className="flex-1">Weight ({unit})</span>
           <span className="flex-1">Reps</span>
@@ -492,14 +492,14 @@ function ExerciseCard({
 
         {slot.rows.map((row, index) => (
           <div key={index} className="flex items-center gap-2">
-            <span className="w-6 text-sm font-medium text-slate-400">{index + 1}</span>
+            <span className="w-6 text-sm font-medium text-ink-ghost">{index + 1}</span>
             <div className="flex-1">
               <NumberInput
                 value={row.weight}
                 min={0}
                 onChange={(event) => onEdit(index, { weight: event.target.value })}
                 aria-label={`${slot.name} set ${index + 1} weight`}
-                className={row.logged ? 'bg-slate-50 text-slate-500' : ''}
+                className={row.logged ? 'bg-muted text-ink-mute' : ''}
               />
             </div>
             <div className="flex-1">
@@ -508,7 +508,7 @@ function ExerciseCard({
                 min={1}
                 onChange={(event) => onEdit(index, { reps: event.target.value })}
                 aria-label={`${slot.name} set ${index + 1} reps`}
-                className={row.logged ? 'bg-slate-50 text-slate-500' : ''}
+                className={row.logged ? 'bg-muted text-ink-mute' : ''}
               />
             </div>
             <LogButton
@@ -524,20 +524,20 @@ function ExerciseCard({
         ))}
 
         {slot.rows.some((row) => row.isBest) && (
-          <p className="pt-1 text-xs font-semibold text-brand-700">
+          <p className="pt-1 text-xs font-semibold text-brand">
             New best on this lift. 🎉
           </p>
         )}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs font-semibold">
-        <button type="button" onClick={onAddRow} className="py-1.5 text-brand-700">
+        <button type="button" onClick={onAddRow} className="py-1.5 text-brand">
           Add a set
         </button>
-        <button type="button" onClick={onSwap} className="py-1.5 text-slate-500">
+        <button type="button" onClick={onSwap} className="py-1.5 text-ink-mute">
           Swap exercise
         </button>
-        <button type="button" onClick={onRemove} className="py-1.5 text-slate-500">
+        <button type="button" onClick={onRemove} className="py-1.5 text-ink-mute">
           Skip today
         </button>
       </div>
@@ -562,8 +562,8 @@ function LogButton({ logged, ready, label, onClick }: {
       className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border
         text-lg transition disabled:opacity-40 ${
           logged
-            ? 'border-brand-600 bg-brand-600 text-white'
-            : 'border-slate-300 bg-white text-slate-400'
+            ? 'border-brand bg-brand text-white'
+            : 'border-line-in bg-white text-ink-ghost'
         }`}
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -591,18 +591,18 @@ function FinishedCard({ routine, summary, profile }: {
     <Page title="Workout done" subtitle={routine.name}>
       <Card>
         {summary.setsDone === 0 ? (
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-ink-soft">
             Nothing logged this time — no harm done. The streak that matters is the one
             across months, not any single session.
           </p>
         ) : (
           <>
-            <p className="text-base font-semibold text-slate-900">
+            <p className="text-base font-semibold text-ink">
               {summary.setsDone} {summary.setsDone === 1 ? 'set' : 'sets'} across{' '}
               {summary.exercisesDone}{' '}
               {summary.exercisesDone === 1 ? 'exercise' : 'exercises'}.
             </p>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-ink-soft">
               {Math.round(fromKg(summary.totalVolumeKg, profile.units)).toLocaleString()}{' '}
               {unit} moved in total.
             </p>
@@ -610,11 +610,11 @@ function FinishedCard({ routine, summary, profile }: {
         )}
 
         {summary.newBests.length > 0 && (
-          <div className="mt-4 rounded-xl bg-brand-50 p-3">
-            <p className="text-sm font-semibold text-brand-800">
+          <div className="mt-4 rounded-xl bg-brand-wash p-3">
+            <p className="text-sm font-semibold text-brand">
               {summary.newBests.length === 1 ? 'New best' : `${summary.newBests.length} new bests`}
             </p>
-            <ul className="mt-1.5 space-y-1 text-sm text-brand-700">
+            <ul className="mt-1.5 space-y-1 text-sm text-brand">
               {summary.newBests.map((best) => (
                 <li key={best.name} className="flex justify-between gap-3">
                   <span className="truncate">{best.name}</span>
@@ -631,8 +631,8 @@ function FinishedCard({ routine, summary, profile }: {
       <div className="mt-6">
         <Link
           to="/lift"
-          className="block w-full rounded-xl bg-brand-600 px-4 py-3 text-center text-base
-            font-semibold text-white hover:bg-brand-700"
+          className="block w-full rounded-xl bg-brand px-4 py-3 text-center text-base
+            font-semibold text-white hover:bg-brand-hi"
         >
           Done
         </Link>

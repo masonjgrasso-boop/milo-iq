@@ -7,8 +7,8 @@ import { ToastContext, type ToastState, type ToastTone } from './toast-context';
 const DURATIONS: Record<ToastTone, number> = { success: 1800, error: 6000 };
 
 const TONE_STYLES: Record<ToastTone, string> = {
-  success: 'bg-brand-600 text-white',
-  error: 'bg-red-600 text-white',
+  success: 'bg-brand text-white',
+  error: 'bg-danger text-white',
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {

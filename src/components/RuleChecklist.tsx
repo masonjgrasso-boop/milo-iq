@@ -31,13 +31,13 @@ export function RuleChecklist({ rules, date, day, weekDays, historyDays, onChang
   if (rules.length === 0) {
     return (
       <Card>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-soft">
           Rules are the habits you want to hold yourself to — no weekday drinking,
           10k steps, eating out once a week.
         </p>
         <Link
           to="/rules/edit"
-          className="mt-3 inline-block text-sm font-semibold text-brand-600 hover:text-brand-700"
+          className="mt-3 inline-block text-sm font-semibold text-brand hover:text-brand"
         >
           Create your first rule &rarr;
         </Link>
@@ -48,7 +48,7 @@ export function RuleChecklist({ rules, date, day, weekDays, historyDays, onChang
   if (todays.length === 0) {
     return (
       <Card>
-        <p className="text-sm text-slate-500">No rules apply today. Enjoy it.</p>
+        <p className="text-sm text-ink-mute">No rules apply today. Enjoy it.</p>
       </Card>
     );
   }
@@ -102,7 +102,7 @@ function Streak({ count, weekly }: { count: number; weekly: boolean }) {
       ? 'day'
       : 'days';
   return (
-    <span className="block text-xs text-slate-400">
+    <span className="block text-xs text-ink-ghost">
       {count} {unit} in a row
     </span>
   );
@@ -125,15 +125,15 @@ function CheckRow({ rule, checked, streak, weekly, onToggle }: {
         className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-4 text-left
           shadow-sm transition ${
             checked
-              ? 'border-brand-300 bg-brand-50'
-              : 'border-slate-200 bg-white hover:bg-slate-50'
+              ? 'border-brand bg-brand-wash'
+              : 'border-line bg-white hover:bg-muted'
           }`}
       >
         <Tick checked={checked} />
         <span className="min-w-0 flex-1">
           <span
             className={`block truncate font-medium ${
-              checked ? 'text-brand-900' : 'text-slate-900'
+              checked ? 'text-brand' : 'text-ink'
             }`}
           >
             {rule.name}
@@ -141,7 +141,7 @@ function CheckRow({ rule, checked, streak, weekly, onToggle }: {
           {weekly ? (
             <span
               className={`block text-xs ${
-                weekly.withinLimit ? 'text-slate-500' : 'text-amber-600'
+                weekly.withinLimit ? 'text-ink-mute' : 'text-over'
               }`}
             >
               {weekly.used} of {weekly.limit} used this week
@@ -196,16 +196,16 @@ function NumericRow({ rule, value, streak, onCommit }: {
   return (
     <li
       className={`rounded-2xl border px-4 py-4 shadow-sm transition ${
-        met ? 'border-brand-300 bg-brand-50' : 'border-slate-200 bg-white'
+        met ? 'border-brand bg-brand-wash' : 'border-line bg-white'
       }`}
     >
       <div className="flex items-center gap-3">
         <Tick checked={met} />
         <div className="min-w-0 flex-1">
-          <p className={`truncate font-medium ${met ? 'text-brand-900' : 'text-slate-900'}`}>
+          <p className={`truncate font-medium ${met ? 'text-brand' : 'text-ink'}`}>
             {rule.name}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-mute">
             Goal {rule.target.toLocaleString()} {rule.unit ?? ''}
           </p>
           <Streak count={streak} weekly={false} />
@@ -223,7 +223,7 @@ function NumericRow({ rule, value, streak, onCommit }: {
             }}
             placeholder={rule.unit ?? 'Amount'}
             aria-label={rule.name}
-            className={met ? 'border-brand-500 bg-white' : ''}
+            className={met ? 'border-brand bg-white' : ''}
           />
         </span>
         <button
@@ -231,8 +231,8 @@ function NumericRow({ rule, value, streak, onCommit }: {
           onClick={() => onCommit(rule.id, met ? undefined : rule.target)}
           className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
             met
-              ? 'border-slate-300 bg-white text-slate-500 hover:bg-slate-50'
-              : 'border-brand-300 bg-brand-50 text-brand-700 hover:bg-brand-100'
+              ? 'border-line-in bg-white text-ink-mute hover:bg-muted'
+              : 'border-brand bg-brand-wash text-brand hover:bg-brand-pill'
           }`}
         >
           {met ? 'Clear' : 'Done'}
@@ -250,8 +250,8 @@ function Tick({ checked }: { checked: boolean }) {
       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2
         transition ${
           checked
-            ? 'border-brand-600 bg-brand-600 text-white'
-            : 'border-slate-300 bg-white text-transparent'
+            ? 'border-brand bg-brand text-white'
+            : 'border-line-in bg-white text-transparent'
         }`}
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5">

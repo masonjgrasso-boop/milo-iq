@@ -51,11 +51,11 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
   // Nothing to undo, but days are missing: reassure and move on.
   if (!needsPlan) {
     return (
-      <Card className="border-slate-200 bg-slate-50">
-        <h3 className="text-sm font-semibold text-slate-900">
+      <Card className="border-line bg-muted">
+        <h3 className="text-sm font-semibold text-ink">
           {missedDays === 1 ? 'A day without a log' : `${missedDays} days without a log`}
         </h3>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-ink-soft">
           {progress ? `${progress} ` : ''}
           No harm done — what you did log is on track. Pick it back up today; the trend is
           what counts, not any single day.
@@ -68,11 +68,11 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
   // genuinely nothing safe to trim. Saying so plainly beats inventing a cut.
   if (plan.dailyAdjustment === 0) {
     return (
-      <Card className="border-slate-200 bg-slate-50">
-        <h3 className="text-sm font-semibold text-slate-900">
+      <Card className="border-line bg-muted">
+        <h3 className="text-sm font-semibold text-ink">
           {progress ?? 'One weekend has not undone your month.'}
         </h3>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-ink-soft">
           You are {cal(week.gapTotal)} short of your pace for the week, but your target is
           already at the lowest we would recommend — so there is nothing safe to trim.
           Carry on as normal and this washes out of the trend over the next week or two.
@@ -82,16 +82,16 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
   }
 
   return (
-    <Card className="border-brand-200 bg-brand-50">
-      <h3 className="text-sm font-semibold text-brand-900">
+    <Card className="border-brand-pill bg-brand-wash">
+      <h3 className="text-sm font-semibold text-brand">
         {progress ?? 'Still moving in the right direction.'}
       </h3>
 
       {month.actualTotal > 0 && (
-        <p className="mt-1 text-sm text-brand-800">One weekend didn&rsquo;t undo that.</p>
+        <p className="mt-1 text-sm text-brand">One weekend didn&rsquo;t undo that.</p>
       )}
 
-      <p className="mt-3 text-sm text-brand-800">
+      <p className="mt-3 text-sm text-brand">
         To get back on pace for the week:{' '}
         <strong>
           eat {plan.dailyAdjustment.toLocaleString()} fewer calories a day for {plan.days}{' '}
@@ -101,7 +101,7 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
         {week.targetCalories.toLocaleString()}.
       </p>
 
-      <dl className="mt-3 space-y-1 border-t border-brand-200 pt-3 text-xs text-brand-800">
+      <dl className="mt-3 space-y-1 border-t border-brand-pill pt-3 text-xs text-brand">
         <div className="flex justify-between gap-3">
           <dt>Short of pace this week</dt>
           <dd className="font-semibold">{cal(week.gapTotal)} cal</dd>
@@ -116,14 +116,14 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
       </dl>
 
       {!plan.fullyCovered && (
-        <p className="mt-3 text-sm text-brand-800">
+        <p className="mt-3 text-sm text-brand">
           We are deliberately letting the last {cal(plan.shortfallCalories)} go. Chasing all
           of it would mean cutting further than is sensible, and the trend will absorb it on
           its own.
         </p>
       )}
 
-      <p className="mt-3 text-xs text-brand-700">
+      <p className="mt-3 text-xs text-brand">
         Nothing is ruined. This is a rounding error against a month of consistency.
       </p>
     </Card>

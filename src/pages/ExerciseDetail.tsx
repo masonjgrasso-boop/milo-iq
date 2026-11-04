@@ -110,7 +110,7 @@ export function ExerciseDetail() {
     return (
       <Page title="Loading…">
         <Card>
-          <p className="text-sm text-slate-400">One moment…</p>
+          <p className="text-sm text-ink-ghost">One moment…</p>
         </Card>
       </Page>
     );
@@ -120,8 +120,8 @@ export function ExerciseDetail() {
     return (
       <Page title="Not found">
         <Card>
-          <p className="text-sm text-slate-600">That exercise no longer exists.</p>
-          <Link to="/lift/exercises" className="mt-3 inline-block text-sm font-semibold text-brand-600">
+          <p className="text-sm text-ink-soft">That exercise no longer exists.</p>
+          <Link to="/lift/exercises" className="mt-3 inline-block text-sm font-semibold text-brand">
             Back to exercises
           </Link>
         </Card>
@@ -135,15 +135,15 @@ export function ExerciseDetail() {
     <Page title={exercise.name}>
       <Link
         to="/lift/exercises"
-        className="mb-4 inline-block text-sm font-medium text-slate-500 hover:text-slate-700"
+        className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
       >
         &larr; All exercises
       </Link>
 
       {lastLabel && exercise.lastSets && exercise.lastSets.length > 0 && (
-        <Card className="mb-4 bg-slate-50">
-          <p className="text-xs font-medium text-slate-500">Last time ({lastLabel})</p>
-          <p className="mt-1 text-sm text-slate-700">
+        <Card className="mb-4 bg-muted">
+          <p className="text-xs font-medium text-ink-mute">Last time ({lastLabel})</p>
+          <p className="mt-1 text-sm text-ink-soft">
             {exercise.lastSets
               .map((set) => `${fromKg(set.weightKg, profile.units).toFixed(0)}${unit} x ${set.reps}`)
               .join(' · ')}
@@ -152,7 +152,7 @@ export function ExerciseDetail() {
       )}
 
       <Card className="space-y-3">
-        <div className="flex items-center gap-3 text-xs font-medium text-slate-500">
+        <div className="flex items-center gap-3 text-xs font-medium text-ink-mute">
           <span className="w-8">Set</span>
           <span className="flex-1">Weight ({unit})</span>
           <span className="flex-1">Reps</span>
@@ -166,7 +166,7 @@ export function ExerciseDetail() {
           );
           return (
             <div key={index} className="flex items-center gap-3">
-              <span className="w-8 text-sm font-medium text-slate-400">{index + 1}</span>
+              <span className="w-8 text-sm font-medium text-ink-ghost">{index + 1}</span>
               <div className="flex-1">
                 <NumberInput
                   value={set.weight}
@@ -181,7 +181,7 @@ export function ExerciseDetail() {
                   aria-label={`Set ${index + 1} reps`}
                 />
               </div>
-              <span className="w-16 text-right text-sm font-semibold text-slate-700">
+              <span className="w-16 text-right text-sm font-semibold text-ink-soft">
                 {e1rm === null ? '—' : fromKg(e1rm, profile.units).toFixed(0)}
               </span>
             </div>
@@ -207,16 +207,16 @@ export function ExerciseDetail() {
         </Button>
       </Card>
 
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-slate-900">Estimated 1RM over time</h2>
+      <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">Estimated 1RM over time</h2>
       <Card>
         {points.length >= 2 ? (
           <StrengthChart data={points} unit={unit} />
         ) : (
-          <p className="py-10 text-center text-sm text-slate-500">
+          <p className="py-10 text-center text-sm text-ink-mute">
             Log this exercise on two or more days to see your progress line.
           </p>
         )}
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-ink-mute">
           Each point is your best set that session, converted to an estimated one-rep max.
           Adding reps at the same weight moves the line up just as adding weight does.
         </p>

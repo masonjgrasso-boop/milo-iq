@@ -113,8 +113,8 @@ export function DragHandle({ handle, label }: { handle: DragHandleProps; label: 
       {...handle}
       aria-label={`Reorder ${label}. Use the arrow keys, or drag.`}
       className="-ml-1 flex h-11 w-9 shrink-0 cursor-grab touch-none items-center
-        justify-center rounded-lg text-slate-400 active:cursor-grabbing
-        active:bg-slate-100 hover:text-slate-600"
+        justify-center rounded-lg text-ink-ghost active:cursor-grabbing
+        active:bg-muted hover:text-ink-soft"
     >
       <svg viewBox="0 0 10 16" className="h-4 w-2.5" aria-hidden="true" fill="currentColor">
         <circle cx="2" cy="3" r="1.4" />

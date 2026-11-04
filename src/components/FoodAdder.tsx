@@ -101,18 +101,18 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
 
       {savedFoods.length > 0 && mode === 'label' && (
         <div>
-          <p className="mb-2 text-sm font-medium text-slate-700">Your foods</p>
+          <p className="mb-2 text-sm font-medium text-ink-soft">Your foods</p>
           <div className="flex flex-wrap gap-2">
             {savedFoods.map((food) => (
               <span key={food.id} className="group relative">
                 <button
                   type="button"
                   onClick={() => fillFromSaved(food)}
-                  className="rounded-full border border-slate-300 bg-white py-1.5 pl-3 pr-7
-                    text-sm text-slate-700 transition hover:border-brand-500 hover:bg-brand-50"
+                  className="rounded-full border border-line-in bg-white py-1.5 pl-3 pr-7
+                    text-sm text-ink-soft transition hover:border-brand hover:bg-brand-wash"
                 >
                   {food.name}
-                  <span className="ml-1.5 text-xs text-slate-400">
+                  <span className="ml-1.5 text-xs text-ink-ghost">
                     {food.caloriesPerServing}/{food.servingGrams}g
                   </span>
                 </button>
@@ -121,7 +121,7 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
                   aria-label={`Remove ${food.name}`}
                   onClick={() => onDeleteFood(food.id)}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full px-1
-                    text-slate-300 transition hover:text-red-500"
+                    text-ink-off transition hover:text-danger"
                 >
                   &times;
                 </button>
@@ -136,8 +136,8 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder={mode === 'label' ? 'Greek yogurt' : 'Dinner out'}
-          className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-            outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+          className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+            outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
         />
       </Field>
 
@@ -171,12 +171,12 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
 
           <div
             aria-live="polite"
-            className="rounded-xl bg-slate-100 px-4 py-3 text-center text-slate-500"
+            className="rounded-xl bg-muted px-4 py-3 text-center text-ink-mute"
           >
             {computed !== null && Number(gramsEaten) > 0 ? (
-              <span className="text-2xl font-bold text-slate-900">
+              <span className="text-2xl font-bold text-ink">
                 {computed.toLocaleString()}{' '}
-                <span className="text-base font-semibold text-slate-500">cal</span>
+                <span className="text-base font-semibold text-ink-mute">cal</span>
               </span>
             ) : (
               <span className="text-sm">Fill in the three numbers above</span>
@@ -184,12 +184,12 @@ export function FoodAdder({ savedFoods, onAdd, onSaveFood, onUseFood, onDeleteFo
           </div>
 
           {!fromFoodId && name.trim() && (
-            <label className="flex items-center gap-2.5 text-sm text-slate-600">
+            <label className="flex items-center gap-2.5 text-sm text-ink-soft">
               <input
                 type="checkbox"
                 checked={saveForReuse}
                 onChange={(event) => setSaveForReuse(event.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 accent-brand-600"
+                className="h-4 w-4 rounded border-line-in accent-brand"
               />
               Save to my foods for one-tap reuse
             </label>

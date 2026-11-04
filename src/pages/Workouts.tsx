@@ -75,18 +75,18 @@ export function Workouts() {
   return (
     <Page title="Workouts" subtitle="Set a day up once, then just turn up and lift.">
       {failed ? (
-        <Card className="border-red-200 bg-red-50">
-          <p className="text-sm text-red-800">
+        <Card className="border-cream-line bg-cream">
+          <p className="text-sm text-danger">
             Your workout days would not load — that is usually the connection. Nothing has
             been lost; pull the page down to try again.
           </p>
         </Card>
       ) : routines === null ? (
-        <p className="mt-6 text-center text-sm text-slate-400">Loading…</p>
+        <p className="mt-6 text-center text-sm text-ink-ghost">Loading…</p>
       ) : routines.length === 0 ? (
         <Card>
-          <h2 className="text-sm font-semibold text-slate-900">No workout days yet</h2>
-          <p className="mt-2 text-sm text-slate-600">
+          <h2 className="text-sm font-semibold text-ink">No workout days yet</h2>
+          <p className="mt-2 text-sm text-ink-soft">
             Make a day for each session you run — &ldquo;Day 1: Legs&rdquo;, &ldquo;Day 2:
             Back &amp; Bi&rdquo; — add the exercises once, and every workout after that is
             just typing weight and reps.
@@ -112,7 +112,7 @@ export function Workouts() {
         {creating ? (
           <Card className="space-y-4">
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">
+              <span className="mb-1.5 block text-sm font-medium text-ink-soft">
                 Name this day
               </span>
               <input
@@ -123,8 +123,8 @@ export function Workouts() {
                 }}
                 placeholder="Day 1: Legs"
                 autoFocus
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-                  outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+                  outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />
             </label>
             <div className="flex gap-3">
@@ -146,14 +146,14 @@ export function Workouts() {
       <Card className="mt-6">
         <Link to="/lift/exercises" className="flex items-center justify-between">
           <span>
-            <span className="block text-sm font-semibold text-slate-900">
+            <span className="block text-sm font-semibold text-ink">
               All exercises &amp; progress
             </span>
-            <span className="block text-xs text-slate-500">
+            <span className="block text-xs text-ink-mute">
               Every lift you have done, with its strength graph
             </span>
           </span>
-          <span aria-hidden="true" className="text-slate-400">
+          <span aria-hidden="true" className="text-ink-ghost">
             &rarr;
           </span>
         </Link>
@@ -174,22 +174,22 @@ function RoutineRow({ routine, handle, dragging, isDue }: {
   return (
     <div
       className={`flex items-center gap-1 rounded-2xl border bg-white px-3 py-3 shadow-sm
-        transition ${dragging ? 'border-brand-400 shadow-md' : 'border-slate-200'}
-        ${isDue && !dragging ? 'border-brand-400 ring-2 ring-brand-100' : ''}`}
+        transition ${dragging ? 'border-brand shadow-md' : 'border-line'}
+        ${isDue && !dragging ? 'border-brand ring-2 ring-brand-wash' : ''}`}
     >
       <DragHandle handle={handle} label={routine.name} />
 
       <Link to={`/lift/do/${routine.id}`} className="min-w-0 flex-1 py-1">
         <span className="flex items-center gap-2">
-          <span className="truncate font-semibold text-slate-900">{routine.name}</span>
+          <span className="truncate font-semibold text-ink">{routine.name}</span>
           {isDue && (
-            <span className="shrink-0 rounded-full bg-brand-600 px-2 py-0.5 text-xs
+            <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-xs
               font-semibold text-white">
               Up next
             </span>
           )}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-slate-500">
+        <span className="mt-0.5 block truncate text-xs text-ink-mute">
           {count === 0
             ? 'No exercises yet — tap edit to add some'
             : `${count} ${count === 1 ? 'exercise' : 'exercises'} · ${sets} sets`}
@@ -200,7 +200,7 @@ function RoutineRow({ routine, handle, dragging, isDue }: {
       <Link
         to={`/lift/day/${routine.id}`}
         className="flex h-11 shrink-0 items-center rounded-lg px-3 text-sm font-semibold
-          text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+          text-ink-mute hover:bg-muted hover:text-ink-soft"
       >
         Edit
       </Link>

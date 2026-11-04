@@ -36,16 +36,16 @@ export function MaintenanceBox({ result, basis, profile }: {
   return (
     <Card className="px-4 py-3.5">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+        <h3 className="text-xs font-semibold tracking-wide text-ink-mute uppercase">
           Maintenance calories
         </h3>
-        <p className="shrink-0 text-2xl leading-none font-bold text-slate-900">
+        <p className="shrink-0 text-2xl leading-none font-bold text-ink">
           {basis.calories.toLocaleString()}{' '}
-          <span className="text-xs font-semibold text-slate-500">cal/day</span>
+          <span className="text-xs font-semibold text-ink-mute">cal/day</span>
         </p>
       </div>
 
-      <p className="mt-1.5 text-xs leading-snug text-slate-500">
+      <p className="mt-1.5 text-xs leading-snug text-ink-mute">
         Calculated from your logged calories and weight trend.
         {result.status === 'not-ready' && ` (${estimateNote(result)})`}
       </p>

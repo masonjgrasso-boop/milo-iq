@@ -117,7 +117,7 @@ export function RulesEditor() {
     <Page title="Edit rules" subtitle="Add, change, reorder or retire a habit.">
       <Link
         to="/rules"
-        className="mb-4 inline-block text-sm font-medium text-slate-500 hover:text-slate-700"
+        className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
       >
         &larr; Today&rsquo;s rules
       </Link>
@@ -139,33 +139,33 @@ export function RulesEditor() {
           return (
             <Card
               className={`${rule.active ? '' : 'opacity-60'} ${
-                dragging ? 'border-brand-400 shadow-md' : ''
+                dragging ? 'border-brand shadow-md' : ''
               }`}
             >
               <div className="flex items-start gap-1">
                 <DragHandle handle={handle} label={rule.name} />
                 <div className="min-w-0 flex-1">
-                  <h3 className="truncate font-semibold text-slate-900">{rule.name}</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <h3 className="truncate font-semibold text-ink">{rule.name}</h3>
+                  <p className="mt-0.5 text-xs text-ink-mute">
                     {RULE_TYPE_LABELS[rule.type]}
                     {rule.type === 'numeric' && ` · ${rule.target.toLocaleString()} ${rule.unit ?? ''}`}
                     {rule.type === 'weeklyLimit' && ` · max ${rule.target}`}
                   </p>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <p className="mt-0.5 text-xs text-ink-mute">
                     {rule.daysOfWeek.length === 0
                       ? 'Every day'
                       : rule.daysOfWeek.map((index) => WEEKDAY_LABELS[index]).join(', ')}
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-2xl font-bold text-brand-600">{streak}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-2xl font-bold text-brand">{streak}</p>
+                  <p className="text-xs text-ink-mute">
                     {rule.type === 'weeklyLimit' ? 'week streak' : 'day streak'}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              <div className="mt-3 rounded-xl bg-muted px-3 py-2 text-xs text-ink-soft">
                 {weekly
                   ? `${weekly.used} of ${weekly.limit} used this week`
                   : summary.applicable === 0
@@ -182,8 +182,8 @@ export function RulesEditor() {
                   onCancel={() => setEditing(null)}
                 />
               ) : confirming === rule.id ? (
-                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
-                  <p className="text-sm text-red-800">
+                <div className="mt-3 rounded-xl border border-cream-line bg-cream p-3">
+                  <p className="text-sm text-danger">
                     Delete <strong>{rule.name}</strong>? Every day you already ticked stays
                     recorded — only the rule itself goes.
                   </p>
@@ -193,7 +193,7 @@ export function RulesEditor() {
                     </Button>
                     <Button
                       onClick={() => handleDelete(rule)}
-                      className="bg-red-600 hover:bg-red-700 active:bg-red-700"
+                      className="bg-danger hover:bg-danger active:bg-danger"
                     >
                       Delete
                     </Button>
@@ -204,21 +204,21 @@ export function RulesEditor() {
                   <button
                     type="button"
                     onClick={() => setEditing(rule.id)}
-                    className="font-medium text-brand-700 hover:text-brand-800"
+                    className="font-medium text-brand hover:text-brand"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => handleToggleActive(rule)}
-                    className="font-medium text-slate-500 hover:text-slate-700"
+                    className="font-medium text-ink-mute hover:text-ink-soft"
                   >
                     {rule.active ? 'Pause' : 'Resume'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirming(rule.id)}
-                    className="font-medium text-slate-400 hover:text-red-600"
+                    className="font-medium text-ink-ghost hover:text-danger"
                   >
                     Delete
                   </button>
@@ -238,7 +238,7 @@ export function RulesEditor() {
       </div>
 
       {rules.length === 0 && !adding && (
-        <p className="mt-4 text-center text-sm text-slate-500">
+        <p className="mt-4 text-center text-sm text-ink-mute">
           Start with one. A rule you keep beats three you abandon.
         </p>
       )}
@@ -274,8 +274,8 @@ function RuleForm({ onCreate, onCancel }: {
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="No weekday drinking"
-          className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-            outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+          className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+            outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
         />
       </Field>
 
@@ -307,8 +307,8 @@ function RuleForm({ onCreate, onCancel }: {
                 value={unit}
                 onChange={(event) => setUnit(event.target.value)}
                 placeholder="steps"
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-                  outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+                  outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />
             </Field>
           )}
@@ -327,8 +327,8 @@ function RuleForm({ onCreate, onCancel }: {
                   onClick={() => toggleDay(index)}
                   className={`flex-1 rounded-lg border py-2 text-xs font-medium transition ${
                     selected
-                      ? 'border-brand-600 bg-brand-50 text-brand-700'
-                      : 'border-slate-300 bg-white text-slate-500'
+                      ? 'border-brand bg-brand-wash text-brand'
+                      : 'border-line-in bg-white text-ink-mute'
                   }`}
                 >
                   {label[0]}
@@ -393,13 +393,13 @@ function EditRuleForm({ rule, onSave, onCancel }: {
   }
 
   return (
-    <div className="mt-3 space-y-4 rounded-xl bg-slate-50 p-3">
+    <div className="mt-3 space-y-4 rounded-xl bg-muted p-3">
       <Field label="What is the rule?">
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
-          className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-            outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+          className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+            outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
         />
       </Field>
 
@@ -413,8 +413,8 @@ function EditRuleForm({ rule, onSave, onCancel }: {
               <input
                 value={unit}
                 onChange={(event) => setUnit(event.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-                  outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+                  outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />
             </Field>
           )}
@@ -433,8 +433,8 @@ function EditRuleForm({ rule, onSave, onCancel }: {
                   onClick={() => toggleDay(index)}
                   className={`flex-1 rounded-lg border py-2 text-xs font-medium transition ${
                     selected
-                      ? 'border-brand-600 bg-brand-50 text-brand-700'
-                      : 'border-slate-300 bg-white text-slate-500'
+                      ? 'border-brand bg-brand-wash text-brand'
+                      : 'border-line-in bg-white text-ink-mute'
                   }`}
                 >
                   {label[0]}
@@ -445,7 +445,7 @@ function EditRuleForm({ rule, onSave, onCancel }: {
         </Field>
       )}
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-mute">
         The kind of rule this is cannot change — past check-offs were recorded against it.
       </p>
 

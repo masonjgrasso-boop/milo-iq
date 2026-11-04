@@ -43,21 +43,21 @@ export function ExercisePicker({ exercises, exclude = [], onPick, onCreate, onCa
   );
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
       <input
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder="Search exercises"
         aria-label="Search exercises"
         autoFocus
-        className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-900
-          outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+        className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
+          outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
       />
 
       <div className="mt-3 max-h-72 space-y-1 overflow-y-auto">
         {recent.length > 0 && (
           <>
-            <p className="px-1 pt-1 pb-0.5 text-xs font-semibold text-slate-500">Recent</p>
+            <p className="px-1 pt-1 pb-0.5 text-xs font-semibold text-ink-mute">Recent</p>
             {recent.map((exercise) => (
               <PickRow key={exercise.id} exercise={exercise} onPick={onPick} />
             ))}
@@ -67,7 +67,7 @@ export function ExercisePicker({ exercises, exclude = [], onPick, onCreate, onCa
         {rest.length > 0 && (
           <>
             {recent.length > 0 && (
-              <p className="px-1 pt-3 pb-0.5 text-xs font-semibold text-slate-500">
+              <p className="px-1 pt-3 pb-0.5 text-xs font-semibold text-ink-mute">
                 All exercises
               </p>
             )}
@@ -78,7 +78,7 @@ export function ExercisePicker({ exercises, exclude = [], onPick, onCreate, onCa
         )}
 
         {recent.length === 0 && rest.length === 0 && (
-          <p className="py-4 text-center text-sm text-slate-500">
+          <p className="py-4 text-center text-sm text-ink-mute">
             {typed ? `Nothing matches “${typed}”.` : 'Nothing left to add.'}
           </p>
         )}
@@ -88,8 +88,8 @@ export function ExercisePicker({ exercises, exclude = [], onPick, onCreate, onCa
         <button
           type="button"
           onClick={() => onCreate(typed)}
-          className="mt-2 w-full rounded-xl border border-brand-300 bg-brand-50 px-4 py-3
-            text-left text-sm font-semibold text-brand-700 hover:bg-brand-100"
+          className="mt-2 w-full rounded-xl border border-brand bg-brand-wash px-4 py-3
+            text-left text-sm font-semibold text-brand hover:bg-brand-pill"
         >
           Add &ldquo;{typed}&rdquo; as a new exercise
         </button>
@@ -110,10 +110,10 @@ function PickRow({ exercise, onPick }: { exercise: Exercise; onPick: (e: Exercis
       type="button"
       onClick={() => onPick(exercise)}
       className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3
-        text-left hover:bg-slate-50"
+        text-left hover:bg-muted"
     >
-      <span className="truncate text-sm font-medium text-slate-900">{exercise.name}</span>
-      <span aria-hidden="true" className="shrink-0 text-slate-300">
+      <span className="truncate text-sm font-medium text-ink">{exercise.name}</span>
+      <span aria-hidden="true" className="shrink-0 text-ink-off">
         +
       </span>
     </button>

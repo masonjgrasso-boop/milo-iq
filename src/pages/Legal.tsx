@@ -12,11 +12,11 @@ function Legal({ title, children }: { title: string; children: React.ReactNode }
     <Page title={title}>
       <Link
         to="/"
-        className="mb-4 inline-block text-sm font-medium text-slate-500 hover:text-slate-700"
+        className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
       >
         &larr; Back
       </Link>
-      <div className="space-y-5 text-sm leading-relaxed text-slate-700">{children}</div>
+      <div className="space-y-5 text-sm leading-relaxed text-ink-soft">{children}</div>
     </Page>
   );
 }
@@ -24,7 +24,7 @@ function Legal({ title, children }: { title: string; children: React.ReactNode }
 function Section({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="mb-1.5 text-base font-semibold text-slate-900">{heading}</h2>
+      <h2 className="mb-1.5 text-base font-semibold text-ink">{heading}</h2>
       <div className="space-y-2">{children}</div>
     </section>
   );
@@ -33,7 +33,7 @@ function Section({ heading, children }: { heading: string; children: React.React
 export function Privacy() {
   return (
     <Legal title="Privacy">
-      <p className="text-slate-600">
+      <p className="text-ink-soft">
         Milo IQ is open-source software you or someone you know is running. There is no
         company behind it, no analytics, no advertising and nothing is sold.
       </p>
@@ -67,7 +67,7 @@ export function Privacy() {
           A coach in a group you join can see the same shared summary as other members,
           plus any notes they write about you. A coach cannot see your raw logs.
         </p>
-        <p className="text-slate-600">
+        <p className="text-ink-soft">
           One honest caveat about photos: shared photo thumbnails are published as links
           that work for anyone holding them. Milo IQ only ever shares the small thumbnail,
           never the full-size image, but a link already fetched by someone cannot be
