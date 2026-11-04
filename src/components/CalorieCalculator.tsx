@@ -8,18 +8,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ACTIVITY_LABELS, calculateCalorieTarget } from '../lib/targets';
+import {
+  gentlerRate, rateConcern, rateToKgPerWeek, safeMinimum, type RatePeriod,
+} from '../lib/rate';
 import { feetInchesToCm, toKg, weightUnitLabel } from '../lib/units';
 import type { ActivityLevel, Goal, Sex, UnitSystem } from '../lib/types';
-import { Button, Card, Eyebrow, Field, OptionRow, Segmented, Stat, UnitInput } from './ui';
+import { Button, Card, Eyebrow, Field, NoteBox, OptionRow, Segmented, Stat, UnitInput } from './ui';
 
-/**
- * The rate the estimate assumes when a visitor picks lose or gain.
- *
- * Onboarding asks for this, but a calculator that opens with six questions
- * already is not the place for a seventh. Half a kilo a week is the common
- * default, and the result says out loud that it is what was assumed.
- */
-const ASSUMED_RATE_KG = 0.5;
+const PERIOD_WORDS: Record<RatePeriod, string> = { week: 'a week', month: 'a month' };
 
 export function CalorieCalculator({ onClose }: { onClose: () => void }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -33,6 +29,8 @@ export function CalorieCalculator({ onClose }: { onClose: () => void }) {
   const [sex, setSex] = useState<Sex>('male');
   const [activity, setActivity] = useState<ActivityLevel>('light');
   const [goal, setGoal] = useState<Goal>('lose');
+  const [rate, setRate] = useState('');
+  const [ratePeriod, setRatePeriod] = useState<RatePeriod>('week');
 
   // Escape closes it, and the panel takes focus so a keyboard lands inside.
   useEffect(() => {
@@ -56,6 +54,8 @@ export function CalorieCalculator({ onClose }: { onClose: () => void }) {
   function changeUnits(next: UnitSystem) {
     setUnits(next);
     setWeight('');
+    // A rate in pounds means something else in kilos, so it goes too.
+    setRate('');
   }
 
   const heightCm = units === 'metric'
@@ -64,12 +64,15 @@ export function CalorieCalculator({ onClose }: { onClose: () => void }) {
   const weightKg = toKg(Number(weight), units);
   const ageYears = Number(age);
 
-  const valid =
+  // Maintenance needs only the body, so it appears as soon as that is in.
+  const bodyValid =
     heightCm > 50 && heightCm < 280 &&
     weightKg > 20 && weightKg < 400 &&
     ageYears >= 13 && ageYears <= 120;
 
-  const result = valid
+  const rateKgPerWeek = rateToKgPerWeek(Number(rate), ratePeriod, units);
+
+  const result = bodyValid
     ? calculateCalorieTarget({
         weightKg,
         heightCm,
@@ -77,11 +80,22 @@ export function CalorieCalculator({ onClose }: { onClose: () => void }) {
         sex,
         activity,
         goal,
-        targetRateKgPerWeek: goal === 'maintain' ? 0 : ASSUMED_RATE_KG,
+        targetRateKgPerWeek: goal === 'maintain' ? 0 : rateKgPerWeek,
       })
     : null;
 
-  const rateLabel = units === 'metric' ? '0.5 kg' : '1 lb';
+  // The daily goal waits for a rate, because without one it would just be
+  // maintenance wearing the word "goal".
+  const goalReady = result !== null && (goal === 'maintain' || rateKgPerWeek > 0);
+
+  const concern = result === null
+    ? 'none'
+    : rateConcern({ rateKgPerWeek, weightKg, clampedToFloor: result.clampedToFloor });
+
+  const unit = weightUnitLabel(units);
+  const period = PERIOD_WORDS[ratePeriod];
+  const gentler = bodyValid ? gentlerRate(weightKg, ratePeriod, units) : 0;
+  const losing = goal === 'lose';
 
   return (
     <div
@@ -202,6 +216,29 @@ export function CalorieCalculator({ onClose }: { onClose: () => void }) {
                 ]}
               />
             </Field>
+
+            {/* Maintaining has no rate to ask about, so the question goes. */}
+            {goal !== 'maintain' && (
+              <Field label={losing ? 'How much to lose' : 'How much to gain'}>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <UnitInput
+                    unit={unit}
+                    value={rate}
+                    onChange={(e) => setRate(e.target.value)}
+                    placeholder={units === 'metric' ? '0.5' : '1'}
+                    aria-label={`How much to ${goal} in ${unit} ${period}`}
+                  />
+                  <Segmented
+                    value={ratePeriod}
+                    onChange={setRatePeriod}
+                    options={[
+                      { value: 'week', label: 'per week' },
+                      { value: 'month', label: 'per month' },
+                    ]}
+                  />
+                </div>
+              </Field>
+            )}
           </Card>
 
           <Card className="flex flex-col gap-2.5">
@@ -234,41 +271,71 @@ export function CalorieCalculator({ onClose }: { onClose: () => void }) {
                 </p>
               </div>
 
-              <Card className="flex flex-col gap-3.5">
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs font-bold text-ink-mute">Your daily goal</p>
-                  <p className="flex items-baseline gap-2">
-                    <span className="display tnum text-[38px] text-brand">
-                      {result.calorieTarget.toLocaleString()}
-                    </span>
-                    <span className="text-sm text-ink-mute">cal / day</span>
+              {goalReady ? (
+                <Card className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs font-bold text-ink-mute">Your daily goal</p>
+                    <p className="flex items-baseline gap-2">
+                      <span className="display tnum text-[38px] text-brand">
+                        {result.calorieTarget.toLocaleString()}
+                      </span>
+                      <span className="text-sm text-ink-mute">cal / day</span>
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Stat label="Maintenance" value={result.tdee.toLocaleString()} />
+                    <Stat
+                      label={goal === 'maintain' ? 'Holding steady' : 'Daily change'}
+                      value={
+                        goal === 'maintain'
+                          ? '0'
+                          : `${losing ? '−' : '+'}${Math.abs(
+                              result.tdee - result.calorieTarget,
+                            ).toLocaleString()}`
+                      }
+                      tone={goal === 'maintain' ? 'neutral' : 'good'}
+                    />
+                  </div>
+
+                  {goal === 'maintain' && (
+                    <p className="text-[13px] text-ink-mute">
+                      No deficit or surplus — this is maintenance.
+                    </p>
+                  )}
+
+                  {concern === 'none' && goal !== 'maintain' && (
+                    <p className="text-[13px] text-ink-mute">
+                      At {rate} {unit} {period}, that is the deficit your goal asks for.
+                    </p>
+                  )}
+
+                  {/* Gentle, and specific: both notes name a rate to try instead. */}
+                  {concern === 'below-minimum' && (
+                    <NoteBox tone="cream">
+                      {losing ? 'Losing' : 'Gaining'} {rate} {unit} {period} would put you
+                      under {safeMinimum(sex).toLocaleString()} calories a day, which is
+                      lower than we would suggest going. Your goal is being held at{' '}
+                      {result.calorieTarget.toLocaleString()} instead. Around {gentler}{' '}
+                      {unit} {period} is a pace you can actually hold.
+                    </NoteBox>
+                  )}
+
+                  {concern === 'aggressive' && (
+                    <NoteBox tone="cream">
+                      That is more than 1% of your body weight a week. It works, but it is
+                      hard to stick to and more of the change comes from muscle. Around{' '}
+                      {gentler} {unit} {period} tends to go better.
+                    </NoteBox>
+                  )}
+                </Card>
+              ) : (
+                <Card tone="muted">
+                  <p className="text-sm text-ink-soft">
+                    Enter how much you want to {goal} and your daily goal appears here.
                   </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Stat label="Maintenance" value={result.tdee.toLocaleString()} />
-                  <Stat
-                    label={goal === 'maintain' ? 'Holding steady' : 'Daily change'}
-                    value={
-                      goal === 'maintain'
-                        ? '0'
-                        : `${goal === 'lose' ? '−' : '+'}${Math.abs(
-                            result.tdee - result.calorieTarget,
-                          ).toLocaleString()}`
-                    }
-                    tone={goal === 'maintain' ? 'neutral' : 'good'}
-                  />
-                </div>
-
-                <p className="text-[13px] text-ink-mute">
-                  {goal === 'maintain'
-                    ? 'No deficit or surplus — this is maintenance.'
-                    : result.clampedToFloor
-                      ? `Losing ${rateLabel} a week would drop you below a safe intake, so this `
-                        + 'is held at the floor instead. A slower rate will feel much better.'
-                      : `Assumes ${rateLabel} a week. A different rate moves this number.`}
-                </p>
-              </Card>
+                </Card>
+              )}
 
               <Card tone="cream" className="flex flex-col gap-3">
                 <p className="text-sm leading-relaxed text-ink-soft">

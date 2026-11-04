@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/auth-context';
 import { Layout } from './components/Layout';
 import { SignIn } from './pages/SignIn';
@@ -36,13 +36,19 @@ const ExerciseDetail = lazy(() =>
 );
 
 /**
- * The signed-in app. Signed-out visitors get the landing page, and anyone who
- * has not finished onboarding is sent to onboarding first.
+ * The signed-in app.
+ *
+ * Signed out, the landing page lives at "/" and every other app path
+ * redirects there, so a signed-out visitor never sits on a URL like /trends
+ * looking at marketing copy. Anyone signed in without a profile goes to
+ * onboarding first.
  */
 function RequireProfile() {
   const { user, profile, loading } = useAuth();
+  const { pathname } = useLocation();
+
   if (loading) return <Spinner />;
-  if (!user) return <Landing />;
+  if (!user) return pathname === '/' ? <Landing /> : <Navigate to="/" replace />;
   if (!profile) return <Navigate to="/onboarding" replace />;
   return <Layout />;
 }

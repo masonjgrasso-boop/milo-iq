@@ -20,8 +20,8 @@ interface Tab {
 const TABS: Tab[] = [
   { to: '/', label: 'Today', d: 'M6 5h12a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3zM3 10h18M8 3v4M16 3v4' },
   { to: '/trends', label: 'Trends', d: 'M3 17l6-6 4 4 8-8M15 7h6v6' },
-  { to: '/rules', label: 'Rules', d: 'M3 7l2 2 4-4M12 7h9M3 16l2 2 4-4M12 16h9' },
   { to: '/lift', label: 'Workouts', d: 'M2 10v4M5 7v10M19 7v10M22 10v4M5 12h14' },
+  { to: '/rules', label: 'Rules', d: 'M3 7l2 2 4-4M12 7h9M3 16l2 2 4-4M12 16h9' },
   { to: '/photos', label: 'Photos', d: 'M6 7h12a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3zM9 7l1.5-3h3L15 7M12 17a3 3 0 1 0 0-6 3 3 0 0 0 0 6z' },
   { to: '/more', label: 'More', d: 'M5 12h.01M12 12h.01M19 12h.01' },
 ];
