@@ -164,6 +164,7 @@ export function Today() {
 
   return (
     <Page
+      wide
       eyebrow={`${weekdayLabel(date)}, ${shortDateLabel(date)}`}
       title={friendlyDayLabel(date)}
       action={
@@ -182,6 +183,10 @@ export function Today() {
         </>
       }
     >
+      {/* One column on a phone. On desktop the day's standing sits beside
+          the two things you came here to type into. */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5">
+      <div className="flex flex-col gap-4">
       <HeroCard className="flex flex-col gap-4">
         <div className="flex items-end justify-between gap-3">
           <div className="flex flex-col gap-1">
@@ -255,7 +260,9 @@ export function Today() {
           missedDays={missedDays}
         />
       )}
+      </div>
 
+      <div className="flex flex-col gap-4">
       <section className="flex flex-col gap-2.5">
         <Eyebrow>Add food</Eyebrow>
         <FoodAdder
@@ -345,6 +352,8 @@ export function Today() {
           )}
         </Card>
       </section>
+      </div>
+      </div>
     </Page>
   );
 }

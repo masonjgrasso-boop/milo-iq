@@ -106,7 +106,8 @@ export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
 }) {
   return (
     <>
-      <ResponsiveContainer width="100%" height={190}>
+      <div className="h-[190px] lg:h-[260px]">
+      <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={data}
           margin={{ top: 14, right: 2, bottom: 0, left: 2 }}
@@ -156,6 +157,7 @@ export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
           />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
 
       {/* Four marks need naming, and a ReferenceLine cannot appear in a
           Recharts legend, so the key is written by hand. It also discharges
@@ -231,7 +233,8 @@ export function WeightChart({ data, unit, ticks, showTrend = false }: {
 }) {
   return (
     <>
-    <ResponsiveContainer width="100%" height={168}>
+    <div className="h-[168px] lg:h-[240px]">
+    <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 8, right: 2, bottom: 0, left: 2 }}>
         <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
         <XAxis dataKey="label" {...axisProps} {...tickProps(ticks)} />
@@ -275,6 +278,7 @@ export function WeightChart({ data, unit, ticks, showTrend = false }: {
         )}
       </LineChart>
     </ResponsiveContainer>
+    </div>
 
     {showTrend && (
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-soft">
@@ -297,7 +301,8 @@ export interface StrengthPoint {
  */
 export function StrengthChart({ data, unit }: { data: StrengthPoint[]; unit: string }) {
   return (
-    <ResponsiveContainer width="100%" height={180}>
+    <div className="h-[180px] lg:h-[260px]">
+    <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 8, right: 2, bottom: 0, left: 2 }}>
         <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
         <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" />
@@ -325,5 +330,6 @@ export function StrengthChart({ data, unit }: { data: StrengthPoint[]; unit: str
         />
       </LineChart>
     </ResponsiveContainer>
+    </div>
   );
 }

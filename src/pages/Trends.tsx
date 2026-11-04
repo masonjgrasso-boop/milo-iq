@@ -35,7 +35,7 @@ export function Trends() {
   if (!profile) return null;
 
   return (
-    <Page eyebrow="The long view" title="Trends">
+    <Page wide eyebrow="The long view" title="Trends">
       <Segmented
         value={range}
         onChange={setRange}
@@ -214,6 +214,7 @@ function Body({
         </Card>
       ) : (
         <>
+          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5">
           <Card className="flex flex-col gap-3.5">
             <ChartHeading label="Weight" headline={weightLine(weightChangeKg, range, profile)} />
             {weightChangeKg !== null && (
@@ -238,6 +239,7 @@ function Body({
               An over day is just one bar. The average line is the one to watch.
             </NoteBox>
           </Card>
+          </div>
 
           <DeficitSummaryCard pace={pace} range={range} sex={profile.sex} />
         </>
