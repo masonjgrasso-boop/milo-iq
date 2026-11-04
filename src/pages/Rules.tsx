@@ -59,9 +59,9 @@ export function Rules() {
   const done = todo.filter((rule) => isMet(rule, day?.rules?.[rule.id])).length;
 
   return (
-    <Page title="Rules" subtitle={friendlyDayLabel(today)}>
+    <Page eyebrow={friendlyDayLabel(today)} title="Rules">
       {failed ? (
-        <Card className="border-cream-line bg-cream">
+        <Card tone="cream">
           <p className="text-sm text-danger">
             Your rules would not load — that is usually the connection. Nothing has been
             lost; reload to try again.
@@ -72,7 +72,7 @@ export function Rules() {
       ) : (
         <>
           {todo.length > 0 && (
-            <p className="mb-3 text-sm font-medium text-ink-soft">
+            <p className="text-[15px] font-semibold text-ink-soft">
               {done === todo.length
                 ? `All ${todo.length} done today. ${encouragement(todo.length)}`
                 : `${done} of ${todo.length} done today.`}
@@ -90,15 +90,13 @@ export function Rules() {
         </>
       )}
 
-      <div className="mt-6">
-        <Link
-          to="/rules/edit"
-          className="block w-full rounded-xl border border-line-in bg-white px-4 py-3
-            text-center text-base font-semibold text-ink-soft hover:bg-muted"
-        >
-          Edit rules
-        </Link>
-      </div>
+      <Link
+        to="/rules/edit"
+        className="mt-2 flex h-[52px] items-center justify-center rounded-btn border
+          border-line-in bg-surface text-base font-bold text-ink transition hover:bg-muted"
+      >
+        Edit rules
+      </Link>
     </Page>
   );
 }

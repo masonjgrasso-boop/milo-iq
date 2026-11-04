@@ -114,13 +114,15 @@ export function RulesEditor() {
   }
 
   return (
-    <Page title="Edit rules" subtitle="Add, change, reorder or retire a habit.">
-      <Link
-        to="/rules"
-        className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
-      >
-        &larr; Today&rsquo;s rules
-      </Link>
+    <Page
+      title="Edit rules"
+      subtitle="Add, change, reorder or retire a habit."
+      back={
+        <Link to="/rules" className="text-sm font-bold text-ink-soft">
+          &larr; Today&rsquo;s rules
+        </Link>
+      }
+    >
 
       <SortableList
         items={rules}
@@ -142,30 +144,26 @@ export function RulesEditor() {
                 dragging ? 'border-brand shadow-md' : ''
               }`}
             >
-              <div className="flex items-start gap-1">
+              <div className="flex items-start gap-3">
                 <DragHandle handle={handle} label={rule.name} />
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate font-semibold text-ink">{rule.name}</h3>
-                  <p className="mt-0.5 text-xs text-ink-mute">
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <h3 className="truncate text-[18px] font-extrabold text-ink">{rule.name}</h3>
+                  <p className="text-[13px] text-ink-mute">
                     {RULE_TYPE_LABELS[rule.type]}
                     {rule.type === 'numeric' && ` · ${rule.target.toLocaleString()} ${rule.unit ?? ''}`}
                     {rule.type === 'weeklyLimit' && ` · max ${rule.target}`}
                   </p>
-                  <p className="mt-0.5 text-xs text-ink-mute">
-                    {rule.daysOfWeek.length === 0
-                      ? 'Every day'
-                      : rule.daysOfWeek.map((index) => WEEKDAY_LABELS[index]).join(', ')}
-                  </p>
+                  <DayPills days={rule.daysOfWeek} />
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-2xl font-bold text-brand">{streak}</p>
-                  <p className="text-xs text-ink-mute">
+                <div className="flex shrink-0 flex-col items-end">
+                  <span className="display text-[34px] text-brand">{streak}</span>
+                  <span className="text-xs text-ink-mute">
                     {rule.type === 'weeklyLimit' ? 'week streak' : 'day streak'}
-                  </p>
+                  </span>
                 </div>
               </div>
 
-              <div className="mt-3 rounded-xl bg-muted px-3 py-2 text-xs text-ink-soft">
+              <div className="mt-3 rounded-input bg-muted px-3 py-2.5 text-[13px] text-ink-soft">
                 {weekly
                   ? `${weekly.used} of ${weekly.limit} used this week`
                   : summary.applicable === 0
@@ -182,7 +180,7 @@ export function RulesEditor() {
                   onCancel={() => setEditing(null)}
                 />
               ) : confirming === rule.id ? (
-                <div className="mt-3 rounded-xl border border-cream-line bg-cream p-3">
+                <div className="mt-3 rounded-input bg-cream p-3">
                   <p className="text-sm text-danger">
                     Delete <strong>{rule.name}</strong>? Every day you already ticked stays
                     recorded — only the rule itself goes.
@@ -200,28 +198,32 @@ export function RulesEditor() {
                   </div>
                 </div>
               ) : (
-                <div className="mt-3 flex gap-4 text-sm">
-                  <button
-                    type="button"
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    size="sm"
+                    block={false}
+                    variant="ghost"
                     onClick={() => setEditing(rule.id)}
-                    className="font-medium text-brand hover:text-brand"
                   >
                     Edit
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    block={false}
+                    variant="secondary"
                     onClick={() => handleToggleActive(rule)}
-                    className="font-medium text-ink-mute hover:text-ink-soft"
                   >
                     {rule.active ? 'Pause' : 'Resume'}
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    block={false}
+                    variant="danger"
+                    className="ml-auto"
                     onClick={() => setConfirming(rule.id)}
-                    className="font-medium text-ink-ghost hover:text-danger"
                   >
                     Delete
-                  </button>
+                  </Button>
                 </div>
               )}
             </Card>
@@ -229,13 +231,11 @@ export function RulesEditor() {
         }}
       />
 
-      <div className="mt-4">
-        {adding ? (
-          <RuleForm onCreate={handleCreate} onCancel={() => setAdding(false)} />
-        ) : (
-          <Button onClick={() => setAdding(true)}>Add a rule</Button>
-        )}
-      </div>
+      {adding ? (
+        <RuleForm onCreate={handleCreate} onCancel={() => setAdding(false)} />
+      ) : (
+        <Button size="lg" onClick={() => setAdding(true)}>Add a rule</Button>
+      )}
 
       {rules.length === 0 && !adding && (
         <p className="mt-4 text-center text-sm text-ink-mute">
@@ -243,6 +243,35 @@ export function RulesEditor() {
         </p>
       )}
     </Page>
+  );
+}
+
+/**
+ * Which days a rule applies to, as seven pills. An empty list means every
+ * day, which is shown as every pill lit rather than as a word, so the shape
+ * of a rule is readable at a glance down the list.
+ */
+function DayPills({ days }: { days: number[] }) {
+  const all = days.length === 0;
+  return (
+    <div className="mt-1 flex gap-1">
+      {WEEKDAY_LABELS.map((label, index) => {
+        const on = all || days.includes(index);
+        return (
+          <span
+            key={label}
+            title={label}
+            className={`flex h-6 w-7 items-center justify-center rounded-[7px] text-[11px]
+              font-bold ${on ? 'bg-brand text-white' : 'bg-brand-wash text-ink-ghost'}`}
+          >
+            {label.charAt(0)}
+          </span>
+        );
+      })}
+      <span className="sr-only">
+        {all ? 'Every day' : days.map((index) => WEEKDAY_LABELS[index]).join(', ')}
+      </span>
+    </div>
   );
 }
 

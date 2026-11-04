@@ -30,15 +30,12 @@ export function RuleChecklist({ rules, date, day, weekDays, historyDays, onChang
 
   if (rules.length === 0) {
     return (
-      <Card>
+      <Card className="flex flex-col gap-3">
         <p className="text-sm text-ink-soft">
           Rules are the habits you want to hold yourself to — no weekday drinking,
           10k steps, eating out once a week.
         </p>
-        <Link
-          to="/rules/edit"
-          className="mt-3 inline-block text-sm font-semibold text-brand hover:text-brand"
-        >
+        <Link to="/rules/edit" className="text-sm font-bold text-brand">
           Create your first rule &rarr;
         </Link>
       </Card>
@@ -122,17 +119,17 @@ function CheckRow({ rule, checked, streak, weekly, onToggle }: {
         type="button"
         onClick={() => onToggle(!checked)}
         aria-pressed={checked}
-        className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-4 text-left
-          shadow-sm transition ${
+        className={`flex w-full items-center gap-3 rounded-card border px-[18px] py-4 text-left
+          shadow-card transition ${
             checked
               ? 'border-brand bg-brand-wash'
-              : 'border-line bg-white hover:bg-muted'
+              : 'border-line bg-surface hover:bg-muted'
           }`}
       >
         <Tick checked={checked} />
         <span className="min-w-0 flex-1">
           <span
-            className={`block truncate font-medium ${
+            className={`block truncate text-[17px] font-extrabold ${
               checked ? 'text-brand' : 'text-ink'
             }`}
           >
@@ -195,14 +192,14 @@ function NumericRow({ rule, value, streak, onCommit }: {
 
   return (
     <li
-      className={`rounded-2xl border px-4 py-4 shadow-sm transition ${
-        met ? 'border-brand bg-brand-wash' : 'border-line bg-white'
+      className={`rounded-card border px-[18px] py-4 shadow-card transition ${
+        met ? 'border-brand bg-brand-wash' : 'border-line bg-surface'
       }`}
     >
       <div className="flex items-center gap-3">
         <Tick checked={met} />
         <div className="min-w-0 flex-1">
-          <p className={`truncate font-medium ${met ? 'text-brand' : 'text-ink'}`}>
+          <p className={`truncate text-[17px] font-extrabold ${met ? 'text-brand' : 'text-ink'}`}>
             {rule.name}
           </p>
           <p className="text-xs text-ink-mute">
@@ -223,15 +220,15 @@ function NumericRow({ rule, value, streak, onCommit }: {
             }}
             placeholder={rule.unit ?? 'Amount'}
             aria-label={rule.name}
-            className={met ? 'border-brand bg-white' : ''}
+            className={met ? 'border-brand' : ''}
           />
         </span>
         <button
           type="button"
           onClick={() => onCommit(rule.id, met ? undefined : rule.target)}
-          className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+          className={`h-[46px] shrink-0 rounded-input border px-4 text-sm font-bold transition ${
             met
-              ? 'border-line-in bg-white text-ink-mute hover:bg-muted'
+              ? 'border-line-in bg-surface text-ink-mute hover:bg-muted'
               : 'border-brand bg-brand-wash text-brand hover:bg-brand-pill'
           }`}
         >
@@ -251,7 +248,7 @@ function Tick({ checked }: { checked: boolean }) {
         transition ${
           checked
             ? 'border-brand bg-brand text-white'
-            : 'border-line-in bg-white text-transparent'
+            : 'border-line-in bg-surface text-transparent'
         }`}
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5">
