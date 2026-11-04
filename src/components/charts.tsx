@@ -15,6 +15,7 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import type { DeficitPoint } from '../lib/deficit';
+import { barPath, barRadii } from '../lib/bars';
 
 export const CHART_COLORS = {
   /** Under maintenance: the brand green. */
@@ -62,26 +63,6 @@ const tooltipProps = {
   cursor: { fill: 'rgb(18 22 20 / 0.04)' },
 };
 
-/** A rounded rectangle with a radius per corner, clamped to fit small bars. */
-function barPath(
-  x: number, y: number, w: number, h: number, top: number, bottom: number,
-): string {
-  const t = Math.min(top, w / 2, h / 2);
-  const b = Math.min(bottom, w / 2, h / 2);
-  return [
-    `M${x + t},${y}`,
-    `H${x + w - t}`,
-    `A${t},${t} 0 0 1 ${x + w},${y + t}`,
-    `V${y + h - b}`,
-    `A${b},${b} 0 0 1 ${x + w - b},${y + h}`,
-    `H${x + b}`,
-    `A${b},${b} 0 0 1 ${x},${y + h - b}`,
-    `V${y + t}`,
-    `A${t},${t} 0 0 1 ${x + t},${y}`,
-    'Z',
-  ].join(' ');
-}
-
 /**
  * One deficit bar. The end pointing away from maintenance is rounded and the
  * end touching it stays nearly square, so a bar always reads as growing out
@@ -94,9 +75,10 @@ function DeficitBar(props: {
   const { x = 0, y = 0, width = 0, height = 0, payload } = props;
   if (!width || !height) return null;
   const under = (payload?.deficit ?? 0) >= 0;
+  const { top, bottom } = barRadii(under);
   return (
     <path
-      d={barPath(x, y, width, height, under ? 5 : 2, under ? 2 : 5)}
+      d={barPath(x, y, width, height, top, bottom)}
       fill={under ? CHART_COLORS.under : CHART_COLORS.over}
     />
   );

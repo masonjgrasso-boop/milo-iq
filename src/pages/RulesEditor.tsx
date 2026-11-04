@@ -254,14 +254,14 @@ export function RulesEditor() {
 function DayPills({ days }: { days: number[] }) {
   const all = days.length === 0;
   return (
-    <div className="mt-1 flex gap-1">
+    <div className="mt-1 grid grid-cols-7 gap-1">
       {WEEKDAY_LABELS.map((label, index) => {
         const on = all || days.includes(index);
         return (
           <span
             key={label}
             title={label}
-            className={`flex h-6 w-7 items-center justify-center rounded-[7px] text-[11px]
+            className={`flex h-6 items-center justify-center rounded-[7px] text-[11px]
               font-bold ${on ? 'bg-brand text-white' : 'bg-brand-wash text-ink-ghost'}`}
           >
             {label.charAt(0)}
