@@ -14,7 +14,7 @@ import {
   clampSets, DEFAULT_SETS, plannedSetCount,
 } from '../lib/routines';
 import type { Routine, RoutineExercise } from '../lib/types';
-import { Button, Card, NumberInput, TextInput } from '../components/ui';
+import { Button, Card, Eyebrow, NumberInput, TextInput } from '../components/ui';
 import { moveItem } from '../lib/order';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { DragHandle, SortableList } from '../components/SortableList';
