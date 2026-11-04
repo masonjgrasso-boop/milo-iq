@@ -12,7 +12,7 @@ import { createRoutine, listRoutines, reorderRoutines } from '../data/routines';
 import { friendlyDayLabel } from '../lib/dates';
 import { nextDueRoutine, plannedSetCount, sortRoutines } from '../lib/routines';
 import type { Routine } from '../lib/types';
-import { Button, Card } from '../components/ui';
+import { Button, Card, Dot, HeroCard, Pill, TextInput } from '../components/ui';
 import { DragHandle, SortableList } from '../components/SortableList';
 import { Page } from '../components/Layout';
 
@@ -73,9 +73,13 @@ export function Workouts() {
   }
 
   return (
-    <Page title="Workouts" subtitle="Set a day up once, then just turn up and lift.">
+    <Page
+      eyebrow="Lifting"
+      title="Workouts"
+      subtitle="Set a day up once, then just turn up and lift."
+    >
       {failed ? (
-        <Card className="border-cream-line bg-cream">
+        <Card tone="cream">
           <p className="text-sm text-danger">
             Your workout days would not load — that is usually the connection. Nothing has
             been lost; pull the page down to try again.
@@ -84,9 +88,9 @@ export function Workouts() {
       ) : routines === null ? (
         <p className="mt-6 text-center text-sm text-ink-ghost">Loading…</p>
       ) : routines.length === 0 ? (
-        <Card>
-          <h2 className="text-sm font-semibold text-ink">No workout days yet</h2>
-          <p className="mt-2 text-sm text-ink-soft">
+        <Card className="flex flex-col gap-2">
+          <h2 className="text-[17px] font-extrabold text-ink">No workout days yet</h2>
+          <p className="text-sm text-ink-soft">
             Make a day for each session you run — &ldquo;Day 1: Legs&rdquo;, &ldquo;Day 2:
             Back &amp; Bi&rdquo; — add the exercises once, and every workout after that is
             just typing weight and reps.
@@ -108,56 +112,56 @@ export function Workouts() {
         />
       )}
 
-      <div className="mt-6">
-        {creating ? (
-          <Card className="space-y-4">
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-ink-soft">
-                Name this day
-              </span>
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') handleCreate();
-                }}
-                placeholder="Day 1: Legs"
-                autoFocus
-                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-                  outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
-              />
-            </label>
-            <div className="flex gap-3">
-              <Button variant="secondary" onClick={() => setCreating(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreate} disabled={!name.trim()}>
-                Create
-              </Button>
-            </div>
-          </Card>
-        ) : (
-          <Button variant="secondary" onClick={() => setCreating(true)}>
-            New workout day
-          </Button>
-        )}
-      </div>
+      {creating ? (
+        <Card className="flex flex-col gap-3.5">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-bold text-ink-soft">Name this day</span>
+            <TextInput
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') handleCreate();
+              }}
+              placeholder="Day 1: Legs"
+              autoFocus
+            />
+          </label>
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setCreating(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={!name.trim()}>
+              Create
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <Button variant="secondary" onClick={() => setCreating(true)}>
+          New workout day
+        </Button>
+      )}
 
-      <Card className="mt-6">
-        <Link to="/lift/exercises" className="flex items-center justify-between">
-          <span>
-            <span className="block text-sm font-semibold text-ink">
-              All exercises &amp; progress
-            </span>
-            <span className="block text-xs text-ink-mute">
-              Every lift you have done, with its strength graph
-            </span>
+      <Link
+        to="/lift/exercises"
+        className="flex items-center justify-between gap-3 rounded-card border border-line
+          bg-surface p-[18px] shadow-card transition hover:bg-muted"
+      >
+        <span className="flex flex-col gap-1">
+          <span className="text-base font-extrabold text-ink">
+            All exercises &amp; progress
           </span>
-          <span aria-hidden="true" className="text-ink-ghost">
-            &rarr;
+          <span className="text-[13px] text-ink-mute">
+            Every lift you have done, with its strength graph
           </span>
-        </Link>
-      </Card>
+        </span>
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full
+            bg-brand-wash font-extrabold text-brand"
+        >
+          &rarr;
+        </span>
+      </Link>
     </Page>
   );
 }
@@ -170,37 +174,71 @@ function RoutineRow({ routine, handle, dragging, isDue }: {
 }) {
   const count = routine.exercises.length;
   const sets = plannedSetCount(routine.exercises);
+  const detail =
+    count === 0
+      ? 'No exercises yet — tap Edit to add some'
+      : `${count} ${count === 1 ? 'exercise' : 'exercises'} · ${sets} sets`;
+
+  // The day that is up next gets the dark card and a Start button, because it
+  // is the one thing this screen exists to get you into.
+  if (isDue && !dragging) {
+    return (
+      <HeroCard className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-col items-start gap-1.5">
+            <Pill tone="onHero">
+              <Dot />
+              Up next
+            </Pill>
+            <span className="display truncate text-[36px]">{routine.name}</span>
+            <span className="text-sm opacity-85">{detail}</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <DragHandle
+              handle={handle}
+              label={routine.name}
+              className="text-white/60 hover:text-white"
+            />
+            <Link
+              to={`/lift/day/${routine.id}`}
+              className="flex h-[34px] items-center rounded-chip border border-white/30
+                px-3.5 text-[13px] font-bold text-white transition hover:bg-white/10"
+            >
+              Edit
+            </Link>
+          </div>
+        </div>
+
+        <Link
+          to={`/lift/do/${routine.id}`}
+          className="flex h-[50px] items-center justify-center rounded-btn bg-surface
+            text-base font-extrabold text-brand transition hover:bg-canvas"
+        >
+          Start {routine.name}
+        </Link>
+      </HeroCard>
+    );
+  }
 
   return (
     <div
-      className={`flex items-center gap-1 rounded-2xl border bg-white px-3 py-3 shadow-sm
-        transition ${dragging ? 'border-brand shadow-md' : 'border-line'}
-        ${isDue && !dragging ? 'border-brand ring-2 ring-brand-wash' : ''}`}
+      className={`flex items-center gap-1 rounded-card border bg-surface px-3 py-3 shadow-card
+        transition ${dragging ? 'border-brand' : 'border-line'}`}
     >
       <DragHandle handle={handle} label={routine.name} />
 
       <Link to={`/lift/do/${routine.id}`} className="min-w-0 flex-1 py-1">
-        <span className="flex items-center gap-2">
-          <span className="truncate font-semibold text-ink">{routine.name}</span>
-          {isDue && (
-            <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-xs
-              font-semibold text-white">
-              Up next
-            </span>
-          )}
-        </span>
+        <span className="block truncate font-bold text-ink">{routine.name}</span>
         <span className="mt-0.5 block truncate text-xs text-ink-mute">
-          {count === 0
-            ? 'No exercises yet — tap edit to add some'
-            : `${count} ${count === 1 ? 'exercise' : 'exercises'} · ${sets} sets`}
+          {detail}
           {routine.lastDoneDate && ` · last ${friendlyDayLabel(routine.lastDoneDate).toLowerCase()}`}
         </span>
       </Link>
 
       <Link
         to={`/lift/day/${routine.id}`}
-        className="flex h-11 shrink-0 items-center rounded-lg px-3 text-sm font-semibold
-          text-ink-mute hover:bg-muted hover:text-ink-soft"
+        className="flex h-11 shrink-0 items-center rounded-chip px-3 text-sm font-bold
+          text-ink-mute transition hover:bg-muted hover:text-ink-soft"
       >
         Edit
       </Link>

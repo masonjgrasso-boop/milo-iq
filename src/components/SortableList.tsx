@@ -106,15 +106,20 @@ export function SortableList<T>({ items, keyOf, onReorder, renderItem, gap = 8 }
 }
 
 /** The grip itself: six dots, a big tap target, and keyboard reorder. */
-export function DragHandle({ handle, label }: { handle: DragHandleProps; label: string }) {
+export function DragHandle({ handle, label, className = '' }: {
+  handle: DragHandleProps;
+  label: string;
+  /** Colour override, for a grip sitting on the dark hero card. */
+  className?: string;
+}) {
   return (
     <button
       type="button"
       {...handle}
       aria-label={`Reorder ${label}. Use the arrow keys, or drag.`}
-      className="-ml-1 flex h-11 w-9 shrink-0 cursor-grab touch-none items-center
-        justify-center rounded-lg text-ink-ghost active:cursor-grabbing
-        active:bg-muted hover:text-ink-soft"
+      className={`-ml-1 flex h-11 w-9 shrink-0 cursor-grab touch-none items-center
+        justify-center rounded-chip active:cursor-grabbing
+        ${className || 'text-ink-ghost hover:text-ink-soft active:bg-muted'}`}
     >
       <svg viewBox="0 0 10 16" className="h-4 w-2.5" aria-hidden="true" fill="currentColor">
         <circle cx="2" cy="3" r="1.4" />
