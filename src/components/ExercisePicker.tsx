@@ -6,7 +6,7 @@
 
 import { useMemo, useState } from 'react';
 import type { Exercise } from '../lib/types';
-import { Button } from './ui';
+import { Button, TextInput } from './ui';
 
 export function ExercisePicker({ exercises, exclude = [], onPick, onCreate, onCancel }: {
   exercises: Exercise[];
@@ -43,15 +43,13 @@ export function ExercisePicker({ exercises, exclude = [], onPick, onCreate, onCa
   );
 
   return (
-    <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
-      <input
+    <div className="rounded-card border border-line bg-surface p-4 shadow-card">
+      <TextInput
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder="Search exercises"
         aria-label="Search exercises"
         autoFocus
-        className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-          outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
       />
 
       <div className="mt-3 max-h-72 space-y-1 overflow-y-auto">
@@ -88,7 +86,7 @@ export function ExercisePicker({ exercises, exclude = [], onPick, onCreate, onCa
         <button
           type="button"
           onClick={() => onCreate(typed)}
-          className="mt-2 w-full rounded-xl border border-brand bg-brand-wash px-4 py-3
+          className="mt-2 w-full rounded-input border border-brand bg-brand-wash px-4 py-3
             text-left text-sm font-semibold text-brand hover:bg-brand-pill"
         >
           Add &ldquo;{typed}&rdquo; as a new exercise
@@ -109,7 +107,7 @@ function PickRow({ exercise, onPick }: { exercise: Exercise; onPick: (e: Exercis
     <button
       type="button"
       onClick={() => onPick(exercise)}
-      className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3
+      className="flex w-full items-center justify-between gap-3 rounded-input px-3 py-3
         text-left hover:bg-muted"
     >
       <span className="truncate text-sm font-medium text-ink">{exercise.name}</span>

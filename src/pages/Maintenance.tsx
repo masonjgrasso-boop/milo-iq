@@ -18,7 +18,7 @@ export function Maintenance() {
   const { profile } = useAuth();
   if (!profile) return null;
   return (
-    <Page title="Maintenance">
+    <Page eyebrow="Measured" title="Maintenance">
       <Body profile={profile} />
     </Page>
   );

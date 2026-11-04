@@ -4,7 +4,7 @@
 export function SetupNotice() {
   return (
     <div className="mx-auto max-w-md px-5 py-16">
-      <h1 className="text-2xl font-bold text-ink">Almost there</h1>
+      <h1 className="display text-[38px] text-ink">Almost there</h1>
       <p className="mt-3 text-ink-soft">
         Milo IQ needs a Firebase project before it can run.
       </p>

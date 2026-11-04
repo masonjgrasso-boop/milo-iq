@@ -4,7 +4,7 @@ import { useAuth } from '../context/auth-context';
 import {
   bundleToCsvFiles, bundleToJson, deleteAccount, exportUserData,
 } from '../data/account';
-import { Button, Card } from '../components/ui';
+import { Button, Card, TextInput } from '../components/ui';
 import { Page } from '../components/Layout';
 
 function download(filename: string, content: string, type: string) {
@@ -64,7 +64,7 @@ export function Account() {
   }
 
   return (
-    <Page title="Your data">
+    <Page eyebrow="Yours to take" title="Your data">
       <Link
         to="/more"
         className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
@@ -73,7 +73,7 @@ export function Account() {
       </Link>
 
       <Card>
-        <h2 className="text-sm font-semibold text-ink">Export everything</h2>
+        <h2 className="text-[17px] font-extrabold text-ink">Export everything</h2>
         <p className="mt-2 text-sm text-ink-soft">
           Your logs, weights, foods, rules, workouts and photo records. It is your data;
           take a copy whenever you like.
@@ -106,12 +106,10 @@ export function Account() {
           <span className="mb-1.5 block text-sm text-ink-soft">
             Type <strong>DELETE</strong> to confirm
           </span>
-          <input
+          <TextInput
             value={confirmText}
             onChange={(event) => setConfirmText(event.target.value)}
             placeholder="DELETE"
-            className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-              outline-none focus:border-danger focus:ring-2 focus:ring-cream-line"
           />
         </label>
 
@@ -119,7 +117,7 @@ export function Account() {
           type="button"
           onClick={handleDelete}
           disabled={confirmText !== 'DELETE' || busy !== null}
-          className="mt-3 w-full rounded-xl bg-danger px-4 py-3 text-base font-semibold
+          className="mt-3 w-full rounded-input bg-danger px-4 py-3 text-base font-semibold
             text-white transition hover:bg-danger disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy === 'delete' ? (step ?? 'Deleting…') : 'Delete my account permanently'}

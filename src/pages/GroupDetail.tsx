@@ -17,7 +17,7 @@ import {
 import { displayNameFor } from '../lib/display';
 import { addDays, friendlyDayLabel, todayKey, weekKeyLabel } from '../lib/dates';
 import { fromKg, weightUnitLabel } from '../lib/units';
-import { Button, Card } from '../components/ui';
+import { Button, Card, Eyebrow } from '../components/ui';
 import { Page } from '../components/Layout';
 
 export function GroupDetail() {
@@ -163,7 +163,7 @@ export function GroupDetail() {
         </p>
       </Card>
 
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">What you share here</h2>
+      <Eyebrow>What you share here</Eyebrow>
       <Card>
         <ul className="divide-y divide-line-soft">
           {SHARE_KEYS.map((key) => (
@@ -194,9 +194,7 @@ export function GroupDetail() {
         </p>
       </Card>
 
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">
-        {isCoach ? 'Your members' : 'The group'}
-      </h2>
+      <Eyebrow>{isCoach ? 'Your members' : 'The group'}</Eyebrow>
 
       {others.length === 0 ? (
         <Card>
@@ -353,7 +351,7 @@ function MemberCard({ member, summary, units, isCoach, notes, onAddNote }: {
           {notes.length > 0 && (
             <ul className="mb-3 space-y-2">
               {notes.map((note) => (
-                <li key={note.id} className="rounded-xl bg-muted px-3 py-2 text-sm text-ink-soft">
+                <li key={note.id} className="rounded-input bg-muted px-3 py-2 text-sm text-ink-soft">
                   {note.text}
                 </li>
               ))}
@@ -364,7 +362,7 @@ function MemberCard({ member, summary, units, isCoach, notes, onAddNote }: {
               value={noteText}
               onChange={(event) => setNoteText(event.target.value)}
               placeholder="Leave a note"
-              className="min-w-0 flex-1 rounded-xl border border-line-in px-3 py-2 text-sm
+              className="min-w-0 flex-1 rounded-input border border-line-in px-3 py-2 text-sm
                 text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
             />
             <button
@@ -376,7 +374,7 @@ function MemberCard({ member, summary, units, isCoach, notes, onAddNote }: {
                 setNoteText('');
                 setSaving(false);
               }}
-              className="shrink-0 rounded-xl bg-brand px-4 py-2 text-sm font-semibold
+              className="shrink-0 rounded-input bg-brand px-4 py-2 text-sm font-semibold
                 text-white disabled:opacity-50"
             >
               Add

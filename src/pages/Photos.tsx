@@ -137,7 +137,7 @@ export function Photos() {
                   <img
                     src={photo.fullUrl}
                     alt={`Progress photo from ${photo.week}`}
-                    className="aspect-[3/4] w-full rounded-xl object-cover"
+                    className="aspect-[3/4] w-full rounded-input object-cover"
                     loading="lazy"
                   />
                   <figcaption className="mt-1.5 text-center text-xs text-ink-mute">
@@ -242,7 +242,7 @@ export function Photos() {
           <img
             src={viewing.fullUrl}
             alt={`Progress photo from ${weekKeyLabel(viewing.week)}`}
-            className="mt-3 min-h-0 flex-1 rounded-xl object-contain"
+            className="mt-3 min-h-0 flex-1 rounded-input object-contain"
           />
           <div className="mt-3 flex items-center justify-between text-xs text-ink-off">
             <span>{formatBytes(viewing.bytes)}</span>

@@ -14,7 +14,7 @@ import {
   clampSets, DEFAULT_SETS, plannedSetCount,
 } from '../lib/routines';
 import type { Routine, RoutineExercise } from '../lib/types';
-import { Button, Card, NumberInput } from '../components/ui';
+import { Button, Card, NumberInput, TextInput } from '../components/ui';
 import { moveItem } from '../lib/order';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { DragHandle, SortableList } from '../components/SortableList';
@@ -125,7 +125,7 @@ export function RoutineEditor() {
   }
 
   return (
-    <Page title={routine.name}>
+    <Page eyebrow="Workout day" title={routine.name}>
       <Link
         to="/lift"
         className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
@@ -136,21 +136,19 @@ export function RoutineEditor() {
       <Card>
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-ink-soft">Day name</span>
-          <input
+          <TextInput
             value={routine.name}
             onChange={(event) => setRoutine({ ...routine, name: event.target.value })}
             onBlur={(event) => {
               const next = event.target.value.trim();
               if (next && next !== routine.name) commit({ name: next });
             }}
-            className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-              outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
           />
         </label>
       </Card>
 
-      <div className="mt-6 mb-2 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold text-ink">Exercises</h2>
+      <div className="flex items-baseline justify-between">
+        <Eyebrow>Exercises</Eyebrow>
         {slots.length > 0 && (
           <span className="text-xs text-ink-mute">{plannedSetCount(slots)} sets planned</span>
         )}
@@ -224,7 +222,7 @@ export function RoutineEditor() {
         <div className="mt-6">
           <Link
             to={`/lift/do/${routine.id}`}
-            className="block w-full rounded-xl bg-brand px-4 py-3 text-center text-base
+            className="block w-full rounded-input bg-brand px-4 py-3 text-center text-base
               font-semibold text-white hover:bg-brand-hi"
           >
             Start this workout
@@ -274,8 +272,8 @@ function SlotRow({ slot, handle, dragging, onChange, onRemove }: {
 }) {
   return (
     <div
-      className={`rounded-2xl border bg-white px-3 py-3 shadow-sm transition
-        ${dragging ? 'border-brand shadow-md' : 'border-line'}`}
+      className={`rounded-card border bg-surface px-3 py-3 shadow-card transition
+        ${dragging ? 'border-brand' : 'border-line'}`}
     >
       <div className="flex items-center gap-1">
         <DragHandle handle={handle} label={slot.name} />

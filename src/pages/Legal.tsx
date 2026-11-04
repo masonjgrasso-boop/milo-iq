@@ -24,7 +24,7 @@ function Legal({ title, children }: { title: string; children: React.ReactNode }
 function Section({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="mb-1.5 text-base font-semibold text-ink">{heading}</h2>
+      <h2 className="mb-1.5 text-[17px] font-extrabold text-ink">{heading}</h2>
       <div className="space-y-2">{children}</div>
     </section>
   );

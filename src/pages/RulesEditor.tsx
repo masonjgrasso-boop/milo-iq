@@ -11,7 +11,7 @@ import {
 } from '../lib/rules';
 import { moveItem } from '../lib/order';
 import type { Rule, RuleType } from '../lib/types';
-import { Button, Card, Choice, Field, NumberInput } from '../components/ui';
+import { Button, Card, Choice, Field, NumberInput, TextInput } from '../components/ui';
 import { DragHandle, SortableList } from '../components/SortableList';
 import { Page } from '../components/Layout';
 
@@ -141,7 +141,7 @@ export function RulesEditor() {
           return (
             <Card
               className={`${rule.active ? '' : 'opacity-60'} ${
-                dragging ? 'border-brand shadow-md' : ''
+                dragging ? 'border-brand' : ''
               }`}
             >
               <div className="flex items-start gap-3">
@@ -299,12 +299,10 @@ function RuleForm({ onCreate, onCancel }: {
   return (
     <Card className="space-y-4">
       <Field label="What is the rule?">
-        <input
+        <TextInput
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="No weekday drinking"
-          className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-            outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
         />
       </Field>
 
@@ -332,12 +330,10 @@ function RuleForm({ onCreate, onCancel }: {
           </Field>
           {type === 'numeric' && (
             <Field label="Unit">
-              <input
+              <TextInput
                 value={unit}
                 onChange={(event) => setUnit(event.target.value)}
                 placeholder="steps"
-                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-                  outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />
             </Field>
           )}
@@ -357,7 +353,7 @@ function RuleForm({ onCreate, onCancel }: {
                   className={`flex-1 rounded-lg border py-2 text-xs font-medium transition ${
                     selected
                       ? 'border-brand bg-brand-wash text-brand'
-                      : 'border-line-in bg-white text-ink-mute'
+                      : 'border-line-in bg-surface text-ink-mute'
                   }`}
                 >
                   {label[0]}
@@ -422,13 +418,11 @@ function EditRuleForm({ rule, onSave, onCancel }: {
   }
 
   return (
-    <div className="mt-3 space-y-4 rounded-xl bg-muted p-3">
+    <div className="mt-3 space-y-4 rounded-input bg-muted p-3">
       <Field label="What is the rule?">
-        <input
+        <TextInput
           value={name}
           onChange={(event) => setName(event.target.value)}
-          className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-            outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
         />
       </Field>
 
@@ -439,11 +433,9 @@ function EditRuleForm({ rule, onSave, onCancel }: {
           </Field>
           {rule.type === 'numeric' && (
             <Field label="Unit">
-              <input
+              <TextInput
                 value={unit}
                 onChange={(event) => setUnit(event.target.value)}
-                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-                  outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />
             </Field>
           )}
@@ -463,7 +455,7 @@ function EditRuleForm({ rule, onSave, onCancel }: {
                   className={`flex-1 rounded-lg border py-2 text-xs font-medium transition ${
                     selected
                       ? 'border-brand bg-brand-wash text-brand'
-                      : 'border-line-in bg-white text-ink-mute'
+                      : 'border-line-in bg-surface text-ink-mute'
                   }`}
                 >
                   {label[0]}

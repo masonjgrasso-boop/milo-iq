@@ -6,7 +6,7 @@ import { createExercise, listExercises, seedStarterExercises } from '../data/wor
 import { friendlyDayLabel } from '../lib/dates';
 import { fromKg, weightUnitLabel } from '../lib/units';
 import type { Exercise } from '../lib/types';
-import { Button, Card, Field } from '../components/ui';
+import { Button, Card, Eyebrow, Field, TextInput } from '../components/ui';
 import { Page } from '../components/Layout';
 
 export function Exercises() {
@@ -60,7 +60,7 @@ export function Exercises() {
   }
 
   return (
-    <Page title="All exercises" subtitle="More weight or more reps — both count as progress.">
+    <Page eyebrow="Progress" title="All exercises" subtitle="More weight or more reps — both count as progress.">
       <Link
         to="/lift"
         className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
@@ -68,13 +68,11 @@ export function Exercises() {
         &larr; Workouts
       </Link>
 
-      <input
+      <TextInput
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder="Search exercises"
         aria-label="Search exercises"
-        className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-          outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
       />
 
       {exercises === null ? (
@@ -83,7 +81,7 @@ export function Exercises() {
         <>
           {recent.length > 0 && (
             <>
-              <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">Recent</h2>
+              <Eyebrow>Recent</Eyebrow>
               <div className="space-y-2">
                 {recent.map((exercise) => (
                   <ExerciseRow key={exercise.id} exercise={exercise} unit={unit} profileUnits={profile.units} />
@@ -92,9 +90,7 @@ export function Exercises() {
             </>
           )}
 
-          <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">
-            {recent.length > 0 ? 'All exercises' : 'Exercises'}
-          </h2>
+          <Eyebrow>{recent.length > 0 ? 'All exercises' : 'Exercises'}</Eyebrow>
           <div className="space-y-2">
             {rest.map((exercise) => (
               <ExerciseRow key={exercise.id} exercise={exercise} unit={unit} profileUnits={profile.units} />
@@ -113,12 +109,10 @@ export function Exercises() {
         {adding ? (
           <Card className="space-y-4">
             <Field label="Exercise name">
-              <input
+              <TextInput
                 value={newName}
                 onChange={(event) => setNewName(event.target.value)}
                 placeholder="Sled push"
-                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-                  outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />
             </Field>
             <div className="flex gap-3">
@@ -148,8 +142,8 @@ function ExerciseRow({ exercise, unit, profileUnits }: {
   return (
     <Link
       to={`/lift/exercise/${exercise.id}`}
-      className="flex items-center justify-between gap-3 rounded-2xl border border-line
-        bg-white px-4 py-3 shadow-sm transition hover:border-brand"
+      className="flex items-center justify-between gap-3 rounded-card border border-line
+        bg-surface px-4 py-3 shadow-card transition hover:border-brand"
     >
       <span className="min-w-0">
         <span className="block truncate font-medium text-ink">{exercise.name}</span>

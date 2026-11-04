@@ -4,7 +4,7 @@ import { useAuth } from '../context/auth-context';
 import { createGroup, joinGroup, listMyGroups, JoinError, type Membership } from '../data/groups';
 import { isValidInviteCode } from '../lib/groups';
 import { displayNameFor } from '../lib/display';
-import { Button, Card, Field } from '../components/ui';
+import { Button, Card, Field, TextInput } from '../components/ui';
 import { Page } from '../components/Layout';
 
 type Mode = 'none' | 'create' | 'join';
@@ -68,7 +68,7 @@ export function Groups() {
   }
 
   return (
-    <Page title="Groups" subtitle="Share only what you choose. Leave whenever you like.">
+    <Page eyebrow="Together" title="Groups" subtitle="Share only what you choose. Leave whenever you like.">
       <Link
         to="/more"
         className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
@@ -93,8 +93,8 @@ export function Groups() {
             <Link
               key={membership.groupId}
               to={`/groups/${membership.groupId}`}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-line
-                bg-white px-4 py-3 shadow-sm transition hover:border-brand"
+              className="flex items-center justify-between gap-3 rounded-card border border-line
+                bg-surface px-4 py-3 shadow-card transition hover:border-brand"
             >
               <span className="min-w-0">
                 <span className="block truncate font-medium text-ink">
@@ -122,12 +122,10 @@ export function Groups() {
         {mode === 'create' && (
           <Card className="space-y-4">
             <Field label="Group name">
-              <input
+              <TextInput
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Thursday lifting crew"
-                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-ink
-                  outline-none focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />
             </Field>
             <label className="flex items-start gap-2.5 text-sm text-ink-soft">
@@ -164,7 +162,7 @@ export function Groups() {
                 placeholder="AB3K9P"
                 maxLength={8}
                 autoCapitalize="characters"
-                className="w-full rounded-xl border border-line-in px-3 py-2.5 text-center
+                className="w-full rounded-input border border-line-in px-3 py-2.5 text-center
                   font-mono text-lg tracking-widest text-ink outline-none
                   focus:border-brand focus:ring-2 focus:ring-brand-pill"
               />

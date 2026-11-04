@@ -307,7 +307,7 @@ function Runner({ routineId, uid, profile }: {
   }
 
   return (
-    <Page title={routine.name} subtitle={friendlyDayLabel(date)}>
+    <Page eyebrow={friendlyDayLabel(date)} title={routine.name}>
       <Link
         to="/lift"
         className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
@@ -559,11 +559,11 @@ function LogButton({ logged, ready, label, onClick }: {
       disabled={!logged && !ready}
       aria-label={logged ? `Undo ${label}` : `Log ${label}`}
       aria-pressed={logged}
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-input border
         text-lg transition disabled:opacity-40 ${
           logged
             ? 'border-brand bg-brand text-white'
-            : 'border-line-in bg-white text-ink-ghost'
+            : 'border-line-in bg-surface text-ink-ghost'
         }`}
     >
       <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
@@ -588,7 +588,7 @@ function FinishedCard({ routine, summary, profile }: {
   const unit = weightUnitLabel(profile.units);
 
   return (
-    <Page title="Workout done" subtitle={routine.name}>
+    <Page eyebrow="Finished" title="Workout done" subtitle={routine.name}>
       <Card>
         {summary.setsDone === 0 ? (
           <p className="text-sm text-ink-soft">
@@ -610,7 +610,7 @@ function FinishedCard({ routine, summary, profile }: {
         )}
 
         {summary.newBests.length > 0 && (
-          <div className="mt-4 rounded-xl bg-brand-wash p-3">
+          <div className="mt-4 rounded-input bg-brand-wash p-3">
             <p className="text-sm font-semibold text-brand">
               {summary.newBests.length === 1 ? 'New best' : `${summary.newBests.length} new bests`}
             </p>
@@ -631,7 +631,7 @@ function FinishedCard({ routine, summary, profile }: {
       <div className="mt-6">
         <Link
           to="/lift"
-          className="block w-full rounded-xl bg-brand px-4 py-3 text-center text-base
+          className="block w-full rounded-input bg-brand px-4 py-3 text-center text-base
             font-semibold text-white hover:bg-brand-hi"
         >
           Done

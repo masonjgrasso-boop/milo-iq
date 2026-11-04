@@ -52,7 +52,7 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
   if (!needsPlan) {
     return (
       <Card tone="cream">
-        <h3 className="text-sm font-semibold text-ink">
+        <h3 className="text-[17px] font-extrabold text-ink">
           {missedDays === 1 ? 'A day without a log' : `${missedDays} days without a log`}
         </h3>
         <p className="mt-2 text-sm text-ink-soft">
@@ -69,7 +69,7 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
   if (plan.dailyAdjustment === 0) {
     return (
       <Card tone="cream">
-        <h3 className="text-sm font-semibold text-ink">
+        <h3 className="text-[17px] font-extrabold text-ink">
           {progress ?? 'One weekend has not undone your month.'}
         </h3>
         <p className="mt-2 text-sm text-ink-soft">

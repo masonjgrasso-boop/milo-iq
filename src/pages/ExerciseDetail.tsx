@@ -7,7 +7,7 @@ import { sessionBests, tryEstimateOneRepMax, type WorkoutSet } from '../lib/stre
 import { friendlyDayLabel, shortDateLabel, todayKey } from '../lib/dates';
 import { fromKg, toKg, weightUnitLabel } from '../lib/units';
 import type { Exercise, WorkoutSession } from '../lib/types';
-import { Button, Card, NumberInput } from '../components/ui';
+import { Button, Card, Eyebrow, NumberInput } from '../components/ui';
 import { StrengthChart, type StrengthPoint } from '../components/charts';
 import { Page } from '../components/Layout';
 
@@ -132,7 +132,7 @@ export function ExerciseDetail() {
   const lastLabel = exercise.lastDate ? friendlyDayLabel(exercise.lastDate) : null;
 
   return (
-    <Page title={exercise.name}>
+    <Page eyebrow="Strength" title={exercise.name}>
       <Link
         to="/lift/exercises"
         className="mb-4 inline-block text-sm font-medium text-ink-mute hover:text-ink-soft"
@@ -207,7 +207,7 @@ export function ExerciseDetail() {
         </Button>
       </Card>
 
-      <h2 className="mt-6 mb-2 text-sm font-semibold text-ink">Estimated 1RM over time</h2>
+      <Eyebrow>Estimated 1RM over time</Eyebrow>
       <Card>
         {points.length >= 2 ? (
           <StrengthChart data={points} unit={unit} />

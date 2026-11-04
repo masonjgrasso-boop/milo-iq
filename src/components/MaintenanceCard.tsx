@@ -46,7 +46,7 @@ export function MaintenanceCard({ result, latestWeightKg }: {
     return (
       <Card>
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-sm font-semibold text-ink">Your real maintenance</h3>
+          <h3 className="text-[17px] font-extrabold text-ink">Your real maintenance</h3>
           <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-ink-soft">
             Starting estimate
           </span>
@@ -79,7 +79,7 @@ export function MaintenanceCard({ result, latestWeightKg }: {
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-sm font-semibold text-ink">Your real maintenance</h3>
+        <h3 className="text-[17px] font-extrabold text-ink">Your real maintenance</h3>
         <span
           className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
             CONFIDENCE_STYLES[result.confidence]
@@ -101,7 +101,7 @@ export function MaintenanceCard({ result, latestWeightKg }: {
       </p>
 
       {differs && (
-        <div className="mt-4 rounded-xl bg-brand-wash p-3">
+        <div className="mt-4 rounded-input bg-brand-wash p-3">
           <p className="text-sm text-brand">
             Based on this, a target of <strong>{suggested.toLocaleString()} cal</strong> fits
             your goal better than your current {profile.calorieTarget.toLocaleString()}.

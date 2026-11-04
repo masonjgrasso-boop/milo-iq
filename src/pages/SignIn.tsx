@@ -109,7 +109,7 @@ export function SignIn() {
               <span
                 aria-hidden="true"
                 className={`flex h-6 w-6 items-center justify-center rounded-full text-sm font-black
-                  ${id === 'google' ? 'bg-white text-brand' : 'bg-brand-wash text-brand'}`}
+                  ${id === 'google' ? 'bg-surface text-brand' : 'bg-brand-wash text-brand'}`}
               >
                 {providerLabels[id].charAt(0)}
               </span>

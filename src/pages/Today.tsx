@@ -227,7 +227,7 @@ export function Today() {
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
                 <div
-                  className="h-full rounded-full bg-white transition-all"
+                  className="h-full rounded-full bg-surface transition-all"
                   style={{ width: `${deficitPct}%` }}
                 />
               </div>
