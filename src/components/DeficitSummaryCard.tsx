@@ -1,8 +1,9 @@
-// The three numbers Trends exists to show, and what to do about them.
+// What to do about where you are.
 //
-// "Status" is a verdict rather than a figure, so it gets the third tile and a
-// sentence of its own underneath — a recovery instruction crammed into a stat
-// tile is unreadable on a phone.
+// The charts above say where that is; this says whether it needs correcting
+// and, if so, by how much. A recovery instruction is a sentence, not a figure,
+// which is why it gets a card of its own rather than being crammed into a
+// stat tile where it would be unreadable on a phone.
 //
 // The verdict reads differently for each goal. Someone gaining who under-ate
 // is just as behind as someone losing who over-ate, but the fix points the
@@ -11,11 +12,11 @@
 
 import { planRecovery, RECOVERY_DAYS, type CatchUpPlan } from '../lib/catchup';
 import { RANGE_LABELS, type TrendRange } from '../lib/deficit';
-import { describeAverage, progressToward, GOAL_GAP_LABEL } from '../lib/goals';
+import { describeAverage } from '../lib/goals';
 import type { PaceSummary } from '../lib/pace';
 import { SAFE_MIN_CALORIES } from '../lib/targets';
 import type { Goal, Sex } from '../lib/types';
-import { Card, Stat } from './ui';
+import { Card } from './ui';
 
 const cal = (value: number): string => Math.abs(Math.round(value)).toLocaleString();
 
@@ -91,31 +92,12 @@ export function DeficitSummaryCard({ pace, range, sex, goal, target }: {
   const plan = pace.worthChasing
     ? planRecovery(pace.gapPerDay, pace.gapTotal, target, sex, goal)
     : planRecovery(0, 0, target, sex, goal);
-  const onTrack = !plan.needed;
 
-  // Positive means the average moved the way the goal wanted. The label names
-  // the side of maintenance, so the figure itself stays a magnitude.
-  const progress = progressToward(goal, pace.actualPerDay);
-
+  // No stat row here any more: the chart above now carries "vs maintenance"
+  // and "vs goal" for the same period, and printing the same two figures
+  // twice on one screen invites the reader to hunt for the difference.
   return (
     <Card className="flex flex-col gap-3.5">
-      <div className="grid grid-cols-3 gap-2">
-        <Stat
-          label={GOAL_GAP_LABEL[goal]}
-          value={goal === 'maintain' ? 'Maintenance' : cal(pace.targetPerDay)}
-        />
-        <Stat
-          label={pace.actualPerDay >= 0 ? 'Avg. below maint.' : 'Avg. above maint.'}
-          value={cal(pace.actualPerDay)}
-          tone={progress > 0 ? 'good' : 'warn'}
-        />
-        <Stat
-          label="Status"
-          value={onTrack ? 'On track' : 'Behind'}
-          tone={onTrack ? 'good' : 'warn'}
-        />
-      </div>
-
       <p className="text-sm text-ink-soft">
         {verdict(pace, plan, safeMinimum, target)}
       </p>

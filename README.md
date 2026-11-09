@@ -29,6 +29,7 @@ Three things follow from that:
 | **Quick calorie calculator** | Serving size + calories per serving + grams eaten → instant total; foods save for one-tap reuse |
 | **Daily log** | Calories and weight, with day, week and month views against target |
 | **Adaptive maintenance** | Measures what you actually burn from your own logs, with a confidence level |
+| **Trends** | Your intake against a maintenance line that moves as it is re-measured, with the gap to your goal shaded in |
 | **Change your goal** | Switch between losing, maintaining and gaining at any time; each past day stays judged against the goal you held that day |
 | **Catch-up guidance** | A gentle, bounded plan after a heavy few days, in whichever direction your goal points |
 | **Rules** | Daily yes/no, daily numeric, and weekly limits, with streaks |
@@ -245,9 +246,11 @@ Firestore bills per document read, so the design minimises them:
 - **A persistent on-device cache** is enabled at startup. Re-viewing data you have
   already loaded costs nothing.
 - **One document per day** holds that day's calories, food entries, weight and rule
-  check-offs together. A month view costs 31 small reads, not hundreds.
-- **Week and month summaries are precomputed** on every day change, so dashboards never
-  touch raw logs.
+  check-offs together. The Trends month view costs about 57 small reads: the 30 days it
+  draws, plus four weeks of lead-in so the maintenance line is a measurement from its
+  very first point rather than easing in from the estimate.
+- **Week and month summaries are precomputed** on every day change, so the 3-month and
+  year views cost about 17 and 57 small documents rather than 90 or 365 raw logs.
 - **Workout sessions are nested under their exercise** and keyed by date, so the progress
   graph is one ordered read needing no composite index.
 - **Each exercise caches its last session**, making prefill a single read rather than a

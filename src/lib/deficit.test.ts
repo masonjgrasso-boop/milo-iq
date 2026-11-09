@@ -1,15 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
-  axisTicks, dailyDeficitPoints, firstActiveIndex, orientPoints, weeklyDeficitPoints,
-  weekKeysFor, sumDays, sumWeeks,
-  BUCKET_FOR, RANGE_DAYS, ROLLING_DAYS, ROLLING_LABELS, ROLLING_WEEKS,
+  axisTicks, firstActiveIndex, weekKeysFor, sumDays, sumWeeks,
+  BUCKET_FOR, RANGE_DAYS,
 } from './deficit';
-import { weekdayLabel, weekKeyToMonday as weekKeyToMondayFor } from './dates';
+import { weekKeyToMonday as weekKeyToMondayFor } from './dates';
 import type { DayLog, PeriodSummary } from './types';
 
 const day = (date: string, calories: number): DayLog => ({ date, calories, entries: [] });
 
-/** Only the fields the deficit series reads. */
+/** Only the fields the totals read. */
 const week = (key: string, totalCalories: number, daysLogged: number): PeriodSummary => ({
   key,
   start: '2026-03-02',
@@ -30,95 +29,9 @@ describe('ranges', () => {
     expect(RANGE_DAYS).toEqual({ month: 30, quarter: 90, year: 365 });
   });
 
-  it('draws a day at a time only for the month', () => {
-    // Ninety daily bars would be about three pixels each on a phone.
+  it('draws a point a day only for the month', () => {
+    // Ninety daily points is a dense scribble at phone width.
     expect(BUCKET_FOR).toEqual({ month: 'day', quarter: 'week', year: 'week' });
-  });
-
-  it('names the averaging window it actually used', () => {
-    expect(ROLLING_LABELS.day).toBe('7-day average');
-    expect(ROLLING_LABELS.week).toBe('4-week average');
-  });
-});
-
-describe('dailyDeficitPoints', () => {
-  it('plots the deficit against maintenance, not against target', () => {
-    const points = dailyDeficitPoints([day('2026-03-02', 2100)], 2500, weekdayLabel);
-    expect(points[0].deficit).toBe(400);
-  });
-
-  it('goes negative on a day above maintenance', () => {
-    const points = dailyDeficitPoints([day('2026-03-02', 3200)], 2500, weekdayLabel);
-    expect(points[0].deficit).toBe(-700);
-  });
-
-  it('leaves an unlogged day as a gap, never as a zero', () => {
-    const points = dailyDeficitPoints(
-      [day('2026-03-02', 2100), day('2026-03-03', 0)],
-      2500,
-      weekdayLabel,
-    );
-    expect(points[1].deficit).toBeNull();
-    expect(points[1].daysLogged).toBe(0);
-  });
-
-  it('averages across logged days only', () => {
-    const points = dailyDeficitPoints(
-      [day('2026-03-02', 2100), day('2026-03-03', 2300)],
-      2500,
-      weekdayLabel,
-    );
-    expect(points[0].rollingAvg).toBe(400);
-    expect(points[1].rollingAvg).toBe(300); // (400 + 200) / 2
-  });
-
-  it('carries the average across a gap without resetting it', () => {
-    const points = dailyDeficitPoints(
-      [day('2026-03-02', 2100), day('2026-03-03', 0), day('2026-03-04', 2100)],
-      2500,
-      weekdayLabel,
-    );
-    expect(points[1].rollingAvg).toBe(400); // unchanged by the missing day
-    expect(points[2].rollingAvg).toBe(400);
-  });
-
-  it('has no average before the first logged day', () => {
-    const points = dailyDeficitPoints([day('2026-03-02', 0)], 2500, weekdayLabel);
-    expect(points[0].rollingAvg).toBeNull();
-  });
-
-  it('only looks back seven days, so the line follows recent behaviour', () => {
-    // Seven days 500 below maintenance, then seven days right on it. A
-    // cumulative average would still read 250 at the end; the point of the
-    // rolling one is that it reads 0.
-    const days = [
-      ...Array.from({ length: 7 }, (_, i) => day(`2026-03-0${i + 2}`, 2000)),
-      ...Array.from({ length: 7 }, (_, i) => day(`2026-03-${i + 9}`, 2500)),
-    ];
-    const points = dailyDeficitPoints(days, 2500, (date) => date);
-
-    expect(points[6].rollingAvg).toBe(500);
-    expect(points[13].rollingAvg).toBe(0);
-  });
-
-  it('drops a day out of the window once it is old enough', () => {
-    const days = Array.from({ length: ROLLING_DAYS + 1 }, (_, i) =>
-      day(`2026-03-${String(i + 2).padStart(2, '0')}`, i === 0 ? 1000 : 2500));
-    const points = dailyDeficitPoints(days, 2500, (date) => date);
-
-    // The 1,500 deficit on the first day is inside the window at index 7...
-    expect(points[ROLLING_DAYS - 1].rollingAvg).toBeGreaterThan(0);
-    // ...and gone by the next bar.
-    expect(points[ROLLING_DAYS].rollingAvg).toBe(0);
-  });
-
-  it('sorts whatever order it is handed', () => {
-    const points = dailyDeficitPoints(
-      [day('2026-03-04', 2000), day('2026-03-02', 2500)],
-      2500,
-      (date) => date,
-    );
-    expect(points.map((point) => point.label)).toEqual(['2026-03-02', '2026-03-04']);
   });
 });
 
@@ -142,53 +55,6 @@ describe('weekKeysFor', () => {
   });
 });
 
-describe('weeklyDeficitPoints', () => {
-  it('averages across the days logged in the week', () => {
-    const points = weeklyDeficitPoints(['2026-W10'], [week('2026-W10', 10_500, 5)], 2500);
-    expect(points[0].deficit).toBe(400); // 2500 - 2100
-  });
-
-  it('leaves a week with no summary as a gap', () => {
-    const points = weeklyDeficitPoints(
-      ['2026-W09', '2026-W10'],
-      [week('2026-W10', 10_500, 5)],
-      2500,
-    );
-    expect(points[0].deficit).toBeNull();
-    expect(points[1].deficit).toBe(400);
-  });
-
-  it('weights the rolling average by days logged, not by weeks', () => {
-    const points = weeklyDeficitPoints(
-      ['2026-W09', '2026-W10'],
-      [week('2026-W09', 2300, 1), week('2026-W10', 12_600, 6)],
-      2500,
-    );
-    // One day 200 below, six days 400 below: (200 + 2400) / 7 = 371.
-    expect(points[0].rollingAvg).toBe(200);
-    expect(points[1].rollingAvg).toBe(371);
-  });
-
-  it('looks back four weeks rather than seven days', () => {
-    const keys = Array.from({ length: 6 }, (_, i) => `2026-W0${i + 4}`);
-    const summaries = keys.map((key, index) =>
-      week(key, index === 0 ? 14_000 : 17_500, 7));
-    const points = weeklyDeficitPoints(keys, summaries, 2500);
-
-    // The first week ran a 500 deficit; the rest sat on maintenance. It is
-    // inside the four-week window at index 3 and outside it at index 4.
-    expect(points[ROLLING_WEEKS - 1].rollingAvg).toBeGreaterThan(0);
-    expect(points[ROLLING_WEEKS].rollingAvg).toBe(0);
-  });
-
-  it('labels a week by its Monday', () => {
-    const points = weeklyDeficitPoints(['2026-W10'], [], 2500);
-    expect(points[0].label).toBe(new Date(2026, 2, 2).toLocaleDateString(undefined, {
-      month: 'short', day: 'numeric',
-    }));
-  });
-});
-
 describe('totals', () => {
   it('counts only logged days', () => {
     expect(sumDays([day('2026-03-02', 2100), day('2026-03-03', 0)])).toEqual({
@@ -202,40 +68,6 @@ describe('totals', () => {
       totalCalories: 14_900,
       daysLogged: 7,
     });
-  });
-});
-
-describe('orientPoints', () => {
-  const points = dailyDeficitPoints(
-    [day('2026-03-02', 2000), day('2026-03-03', 3000)],
-    2500,
-    (date) => date,
-  );
-
-  it('leaves a lose goal alone, where a deficit is already up', () => {
-    expect(orientPoints(points, 'lose')).toEqual(points);
-    expect(orientPoints(points, 'maintain')).toEqual(points);
-  });
-
-  it('turns a gain goal round, so a surplus plots upward', () => {
-    const gaining = orientPoints(points, 'gain');
-    // Eating 500 under maintenance is the bad day for someone gaining.
-    expect(gaining[0].deficit).toBe(-500);
-    // And 500 over it is the good one.
-    expect(gaining[1].deficit).toBe(500);
-  });
-
-  it('turns the average round with the bars, never half of it', () => {
-    const gaining = orientPoints(points, 'gain');
-    expect(gaining[0].rollingAvg).toBe(-500);
-    expect(gaining[1].rollingAvg).toBe(0);
-  });
-
-  it('keeps a gap a gap', () => {
-    const withGap = dailyDeficitPoints([day('2026-03-02', 0)], 2500, (date) => date);
-    const gaining = orientPoints(withGap, 'gain');
-    expect(gaining[0].deficit).toBeNull();
-    expect(gaining[0].rollingAvg).toBeNull();
   });
 });
 
@@ -271,24 +103,21 @@ describe('axisTicks', () => {
     expect(ticks.filter(Boolean)).toHaveLength(5);
   });
 
-  it('spaces the month labels evenly', () => {
+  it('spaces the day labels evenly', () => {
     const ticks = axisTicks(dates('2026-03-02', 30), 'day');
     const labelled = ticks.map((tick, index) => (tick ? index : -1)).filter((i) => i >= 0);
     expect(labelled).toEqual([0, 6, 12, 18, 24]);
   });
 
-  it('labels every bar on a chart trimmed back to a few days', () => {
+  it('labels every point on a chart trimmed back to a few days', () => {
     // Someone three days in gets three labels, not one and two blanks.
     const ticks = axisTicks(dates('2026-03-02', 3), 'day');
     expect(ticks.filter(Boolean)).toHaveLength(3);
   });
 
   it('labels only the start of each month across a year', () => {
-    const mondays = weekKeysFor('2026-03-08', 365).map((key) => key);
-    const ticks = axisTicks(
-      mondays.map((key) => weekKeyToMondayFor(key)),
-      'week',
-    );
+    const mondays = weekKeysFor('2026-03-08', 365).map((key) => weekKeyToMondayFor(key));
+    const ticks = axisTicks(mondays, 'week');
     // Twelve or thirteen month starts fall inside a 53-week span.
     const labels = ticks.filter(Boolean);
     expect(labels.length).toBeGreaterThanOrEqual(12);

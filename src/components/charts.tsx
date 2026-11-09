@@ -4,46 +4,39 @@
 // different measures on different scales, and overlaying them invents visual
 // correlations that are not in the data.
 //
-// Colours come from the design tokens. The two bar colours were checked for
-// colour-vision deficiency against each other and the card surface (OKLab
-// ΔE 30.9 under protanopia), and bars also sit on opposite sides of the zero
-// line, so the distinction never rests on colour alone.
+// Both are line charts of the same shape: a reference the user is measured
+// against, a dashed line for the plan, a solid line for what they actually
+// did, and a callout naming where that solid line has got to. Reading a
+// position against a line is easier than reading the height of a bar against
+// a remembered baseline, which is why the bars went.
 //
-// The deficit chart is oriented by the goal before it gets here: up is always
-// the direction the user meant to go. So the colours stay put — green above
-// the line, amber below — and it is the legend that changes wording, which is
-// what keeps "a bar above the line is a good day" true for every goal.
+// The three calorie lines were checked for colour-vision deficiency as a set
+// (scripts/validate_palette.js): worst all-pairs OKLab ΔE 13.7 under
+// deuteranopia, 15.3 in normal vision, both passing. They also differ in dash
+// pattern and stroke weight, so identity never rests on colour alone, and the
+// key below each chart names every one of them — which is what discharges the
+// sub-3:1 contrast of the two lighter strokes against white.
 
 import type { ReactNode } from 'react';
 import {
-  Bar, CartesianGrid, ComposedChart, Line, LineChart, ReferenceLine,
+  Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceDot,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import type { DeficitPoint } from '../lib/deficit';
-import { GOAL_WORDS } from '../lib/goals';
-import type { Goal } from '../lib/types';
-import { barPath, barRadii } from '../lib/bars';
-
-/**
- * Calories on the side axis, signed, so the reader can tell which side of
- * maintenance a bar is on without counting gridlines.
- */
-const signedCalories = (value: number): string =>
-  (value > 0 ? '+' : '') + value.toLocaleString();
 
 export const CHART_COLORS = {
-  /** Under maintenance: the brand green. */
-  under: '#1a3c2f',
-  /** Over maintenance. */
-  over: '#c9874e',
-  /** The running average, a line rather than a fill. */
-  average: '#2f8a5b',
+  /** What the user actually did: the brand green, and the heaviest stroke. */
+  you: '#1a3c2f',
+  /** The plan. Warm against the cool brand line, and always dashed. */
+  goal: '#c9874e',
+  /** Maintenance, which is a reference rather than a result. */
+  maintenance: '#b5bbb6',
+  /** The gap between the two, as a wash. */
+  gap: '#b9dcc6',
   /** Weigh-ins as logged, before smoothing. */
   raw: '#b7c7bd',
   /** The ring on a weigh-in dot. */
   dot: '#8fa99a',
   grid: '#eef0ec',
-  zero: '#c9cfc9',
   reference: '#8a928c',
   axis: '#8a928c',
 };
@@ -57,7 +50,7 @@ const axisProps = {
 
 /**
  * Axis labels are chosen upstream, where the calendar is known, and handed
- * down as one string per bucket. Recharts is told to keep every tick so the
+ * down as one string per point. Recharts is told to keep every tick so the
  * blanks hold their place, which is what stops labels from colliding or
  * needing to be rotated.
  */
@@ -74,184 +67,174 @@ const tooltipProps = {
     fontWeight: 600,
     boxShadow: '0 8px 24px -14px rgb(18 22 20 / 0.12)',
   },
-  cursor: { fill: 'rgb(18 22 20 / 0.04)' },
+  cursor: { stroke: CHART_COLORS.reference, strokeDasharray: '4 4' },
 };
 
 /**
- * One deficit bar. The end pointing away from maintenance is rounded and the
- * end touching it stays nearly square, so a bar always reads as growing out
- * of the zero line rather than floating beside it.
+ * The two-line callout at the end of a series.
+ *
+ * Recharts hands a label element the `viewBox` of whatever it is attached to,
+ * so this renders relative to the final dot. It is anchored to the right and
+ * drawn to the left of that dot, because the dot sits hard against the side
+ * axis and anything drawn rightward would be clipped.
  */
-function DeficitBar(props: {
-  x?: number; y?: number; width?: number; height?: number;
-  payload?: DeficitPoint;
+function Callout({ viewBox, text, sub }: {
+  viewBox?: { x?: number; y?: number };
+  text: string;
+  sub: string;
 }) {
-  const { x = 0, y = 0, width = 0, height = 0, payload } = props;
-  if (!width || !height) return null;
-  const under = (payload?.deficit ?? 0) >= 0;
-  const { top, bottom } = barRadii(under);
+  const x = viewBox?.x;
+  const y = viewBox?.y;
+  if (x === undefined || y === undefined) return null;
+
   return (
-    <path
-      d={barPath(x, y, width, height, top, bottom)}
-      fill={under ? CHART_COLORS.under : CHART_COLORS.over}
-    />
+    <g>
+      <text
+        x={x - 10}
+        y={y - 7}
+        textAnchor="end"
+        fontSize={12}
+        fontWeight={800}
+        fill="#121614"
+      >
+        {text}
+      </text>
+      <text x={x - 10} y={y + 8} textAnchor="end" fontSize={11} fill="#5d665f">
+        {sub}
+      </text>
+    </g>
   );
 }
 
-/**
- * The deficit against maintenance, period by period.
- *
- * Zero is maintenance, so the sign of a bar is its meaning: above the line is
- * a day that moved the scale, below it a day that did not. That position does
- * the work colour alone should never do.
- *
- * Three marks on one axis, because all three are calories per day: the bars,
- * a flat line for the deficit the goal asks for, and the running average.
- * There is no left axis — the goal line carries its own number, which buys
- * back about fifty pixels of plot on a phone.
- */
-export function DeficitChart({
-  data, goalDeficit, ticks, goal, averageLabel, dense = false, goalChangeAt = [],
-}: {
-  data: DeficitPoint[];
-  /** The gap the goal asks for, already oriented the same way as the bars. */
-  goalDeficit: number;
-  /** One entry per bar; an empty string leaves that bar unlabelled. */
-  ticks: string[];
-  /** Names the two sides of the zero line. */
-  goal: Goal;
-  /** What the trailing average covers, which depends on the bar width. */
-  averageLabel: string;
-  /** The year view packs its fifty-odd bars tighter. */
-  dense?: boolean;
-  /** Bars where a new goal started, as indices into `data`. */
-  goalChangeAt?: number[];
-}) {
-  const words = GOAL_WORDS[goal];
-  // Maintaining asks for no gap, so its goal line would sit exactly on the
-  // zero line already drawn. Two lines in one place reads as a rendering bug.
-  const showGoalLine = goalDeficit !== 0;
+export interface CaloriePoint {
+  label: string;
+  /** Maintenance as it would have been measured on this date. */
+  maintenance: number;
+  /** Maintenance plus whatever the goal in force on this date asked for. */
+  goal: number;
+  /** The trailing average of what was eaten, or null with nothing logged. */
+  you: number | null;
+  /** [goal, you], which Recharts fills between. Null leaves a gap. */
+  band: [number, number] | null;
+}
 
+/**
+ * Calories over time: where maintenance was, where the plan wanted you, and
+ * where you actually were.
+ *
+ * The shaded band between the last two is the whole point of the chart. A
+ * reader should be able to see the size of the gap without reading a single
+ * number, and see it closing without comparing two bar heights a month apart.
+ */
+export function CalorieChart({ data, ticks, latest, maintenanceMeasured }: {
+  data: CaloriePoint[];
+  /** One entry per point; an empty string leaves that point unlabelled. */
+  ticks: string[];
+  /** The callout on the final point of the user's own line. */
+  latest: { value: number; text: string; sub: string } | null;
+  /** False while maintenance is still the starting estimate. */
+  maintenanceMeasured: boolean;
+}) {
   return (
     <>
-      <div className="h-[190px] lg:h-[260px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart
-          data={data}
-          margin={{ top: 14, right: 0, bottom: 0, left: 2 }}
-          barCategoryGap={dense ? '10%' : '22%'}
-        >
-          <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-          <XAxis dataKey="label" {...axisProps} {...tickProps(ticks)} />
-          {/* On the right, matching the weight chart below it, and sparse
-              enough that three numbers never crowd a phone. */}
-          <YAxis
-            {...axisProps}
-            orientation="right"
-            width={46}
-            tickCount={3}
-            tickFormatter={signedCalories}
-          />
-          <Tooltip
-            {...tooltipProps}
-            formatter={(value, name) => [
-              `${Math.abs(Number(value)).toLocaleString()} cal`,
-              name === 'rollingAvg'
-                ? averageLabel
-                : Number(value) >= 0
-                  ? words.above
-                  : words.below,
-            ]}
-          />
-          {/* Maintenance itself. Crossing it is the only thing that matters. */}
-          <ReferenceLine y={0} stroke={CHART_COLORS.zero} />
-          {/* No label on the line itself: a tall bar reaching the top of the
-              plot would sit underneath it. The number is in the key instead. */}
-          {showGoalLine && (
-            <ReferenceLine
-              y={goalDeficit}
-              stroke={CHART_COLORS.reference}
-              strokeDasharray="4 4"
+      <div className="h-[220px] lg:h-[290px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 22, right: 0, bottom: 0, left: 2 }}>
+            <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+            <XAxis dataKey="label" {...axisProps} {...tickProps(ticks)} />
+            <YAxis
+              {...axisProps}
+              orientation="right"
+              width={46}
+              tickCount={4}
+              domain={['dataMin - 120', 'dataMax + 120']}
+              tickFormatter={(value: number) => Math.round(value).toLocaleString()}
+            />
+            <Tooltip
+              {...tooltipProps}
+              formatter={(value, name) => {
+                if (name === 'band') return [];
+                const label = name === 'you'
+                  ? 'You'
+                  : name === 'goal'
+                    ? 'Goal'
+                    : 'Maintenance';
+                return [`${Math.round(Number(value)).toLocaleString()} cal`, label];
+              }}
+            />
+
+            {/* Drawn first so both lines sit on top of it. */}
+            <Area
+              dataKey="band"
+              stroke="none"
+              fill={CHART_COLORS.gap}
+              fillOpacity={0.5}
+              connectNulls
+              isAnimationActive={false}
+            />
+
+            <Line
+              type="monotone"
+              dataKey="maintenance"
+              stroke={CHART_COLORS.maintenance}
               strokeWidth={2}
-              ifOverflow="extendDomain"
+              dot={false}
+              isAnimationActive={false}
             />
-          )}
-          {/* Where the goal changed. An annotation rather than a series: the
-              bars either side are measured against different targets, and
-              without this the step in the dashed goal line looks like a bug.
-              Vertical, so it cannot be mistaken for the goal line itself. */}
-          {goalChangeAt.map((index) => (
-            <ReferenceLine
-              key={`goal-${index}`}
-              x={data[index]?.label}
-              stroke={CHART_COLORS.reference}
-              strokeDasharray="3 3"
-              strokeWidth={1.5}
+            <Line
+              type="monotone"
+              dataKey="goal"
+              stroke={CHART_COLORS.goal}
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              dot={false}
+              isAnimationActive={false}
             />
-          ))}
-          <Bar dataKey="deficit" shape={<DeficitBar />} isAnimationActive={false} />
-          <Line
-            type="monotone"
-            dataKey="rollingAvg"
-            stroke={CHART_COLORS.average}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            dot={false}
-            connectNulls
-            isAnimationActive={false}
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
+            <Line
+              type="monotone"
+              dataKey="you"
+              stroke={CHART_COLORS.you}
+              strokeWidth={3}
+              strokeLinecap="round"
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+
+            {latest && data.length > 0 && (
+              <ReferenceDot
+                x={data[data.length - 1].label}
+                y={latest.value}
+                r={4.5}
+                fill={CHART_COLORS.you}
+                stroke="#fff"
+                strokeWidth={2}
+                label={<Callout text={latest.text} sub={latest.sub} />}
+              />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
 
-      {/* Four marks need naming, and a ReferenceLine cannot appear in a
-          Recharts legend, so the key is written by hand. It also discharges
-          the contrast obligation on the amber, which is below 3:1 on white. */}
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-soft">
-        <Key color={CHART_COLORS.under}>{words.above}</Key>
-        <Key color={CHART_COLORS.over}>{words.below}</Key>
-        <Key color={CHART_COLORS.average} line>{averageLabel}</Key>
-        {showGoalLine && (
-          <Key color={CHART_COLORS.reference} line dashed>
-            Goal ({signedCalories(goalDeficit)} cal)
-          </Key>
-        )}
-        {goalChangeAt.length > 0 && (
-          <Key color={CHART_COLORS.reference} vertical>Goal changed</Key>
-        )}
+        <Key color={CHART_COLORS.you} line>You</Key>
+        <Key color={CHART_COLORS.goal} line dashed>Goal</Key>
+        <Key color={CHART_COLORS.maintenance} line>
+          Maintenance{maintenanceMeasured ? '' : ' (estimate)'}
+        </Key>
       </ul>
     </>
   );
 }
 
-function Key({
-  color, line = false, dashed = false, hollow = false, vertical = false, children,
-}: {
+function Key({ color, line = false, dashed = false, hollow = false, children }: {
   color: string;
   line?: boolean;
   dashed?: boolean;
   /** A ring rather than a fill, matching an unfilled weigh-in dot. */
   hollow?: boolean;
-  /** An upright dashed tick, matching a goal-change marker. */
-  vertical?: boolean;
   children: ReactNode;
 }) {
-  if (vertical) {
-    return (
-      <li className="flex items-center gap-1.5">
-        <span
-          aria-hidden="true"
-          className="h-3.5 w-0.5"
-          style={{
-            backgroundImage:
-              `repeating-linear-gradient(to bottom, ${color} 0 3px, transparent 3px 6px)`,
-          }}
-        />
-        {children}
-      </li>
-    );
-  }
-
   if (hollow) {
     return (
       <li className="flex items-center gap-1.5">
@@ -287,93 +270,109 @@ function Key({
 
 export interface WeightPoint {
   label: string;
+  /** The scale reading, as a faint dot. */
   weight: number | null;
+  /** The smoothed trend, which is the line to read. */
   trend?: number | null;
+  /** Where the goal rate says the trend should be by now. */
+  pace?: number | null;
 }
 
 /**
- * Weight over time: the weigh-ins as hollow dots on a thin line, with the
- * smoothed trend drawn thick on top. The trend is the one to read, so it is
- * the one that carries the weight of the ink.
+ * Weight over time, in the same shape as the calorie chart: the weigh-ins as
+ * faint dots, the smoothed trend thick on top, and the goal pace dashed.
+ *
+ * The trend is the one to read, so it is the one that carries the weight of
+ * the ink; the raw readings are there to show it is not invented.
  */
-export function WeightChart({
-  data, unit, ticks, showTrend = false, goalChangeAt = [],
-}: {
+export function WeightChart({ data, unit, ticks, latest, showPace = false }: {
   data: WeightPoint[];
   unit: string;
   /** Same labels as the chart above it, so the two axes line up. */
   ticks: string[];
-  showTrend?: boolean;
-  /** Points where a new goal started, as indices into `data`. */
-  goalChangeAt?: number[];
+  /** The callout on the final point of the trend line. */
+  latest: { value: number; text: string; sub: string } | null;
+  /** Hidden until there is a goal rate worth projecting. */
+  showPace?: boolean;
 }) {
   return (
     <>
-    <div className="h-[168px] lg:h-[240px]">
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 8, right: 2, bottom: 0, left: 2 }}>
-        <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
-        <XAxis dataKey="label" {...axisProps} {...tickProps(ticks)} />
-        <YAxis
-          {...axisProps}
-          orientation="right"
-          width={34}
-          tickCount={3}
-          domain={['dataMin - 1', 'dataMax + 1']}
-          tickFormatter={(value: number) => value.toFixed(1)}
-        />
-        <Tooltip
-          {...tooltipProps}
-          cursor={{ stroke: CHART_COLORS.reference, strokeDasharray: '4 4' }}
-          formatter={(value, name) => [
-            `${Number(value).toFixed(1)} ${unit}`,
-            name === 'trend' ? 'Trend' : 'Weighed',
-          ]}
-        />
-        {goalChangeAt.map((index) => (
-          <ReferenceLine
-            key={`goal-${index}`}
-            x={data[index]?.label}
-            stroke={CHART_COLORS.reference}
-            strokeDasharray="3 3"
-            strokeWidth={1.5}
-          />
-        ))}
-        <Line
-          type="monotone"
-          dataKey="weight"
-          stroke={CHART_COLORS.raw}
-          strokeWidth={1.5}
-          dot={{ r: 3.5, strokeWidth: 2, stroke: CHART_COLORS.dot, fill: '#fff' }}
-          activeDot={{ r: 5, strokeWidth: 2, stroke: CHART_COLORS.dot, fill: '#fff' }}
-          connectNulls
-          isAnimationActive={false}
-        />
-        {showTrend && (
-          <Line
-            type="monotone"
-            dataKey="trend"
-            stroke={CHART_COLORS.under}
-            strokeWidth={3}
-            strokeLinecap="round"
-            dot={false}
-            connectNulls
-            isAnimationActive={false}
-          />
-        )}
-      </LineChart>
-    </ResponsiveContainer>
-    </div>
+      <div className="h-[200px] lg:h-[270px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 22, right: 0, bottom: 0, left: 2 }}>
+            <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
+            <XAxis dataKey="label" {...axisProps} {...tickProps(ticks)} />
+            <YAxis
+              {...axisProps}
+              orientation="right"
+              width={46}
+              tickCount={4}
+              domain={['dataMin - 0.6', 'dataMax + 0.6']}
+              tickFormatter={(value: number) => value.toFixed(1)}
+            />
+            <Tooltip
+              {...tooltipProps}
+              formatter={(value, name) => [
+                `${Number(value).toFixed(1)} ${unit}`,
+                name === 'trend' ? 'Trend' : name === 'pace' ? 'Goal pace' : 'Weighed',
+              ]}
+            />
 
-    {showTrend && (
+            {/* The raw readings: dots only, no connecting stroke, so they read
+                as evidence behind the trend rather than as a second series. */}
+            <Line
+              type="monotone"
+              dataKey="weight"
+              stroke="none"
+              dot={{ r: 3, strokeWidth: 0, fill: CHART_COLORS.raw }}
+              activeDot={{ r: 5, strokeWidth: 2, stroke: CHART_COLORS.dot, fill: '#fff' }}
+              isAnimationActive={false}
+            />
+
+            {showPace && (
+              <Line
+                type="monotone"
+                dataKey="pace"
+                stroke={CHART_COLORS.goal}
+                strokeWidth={2}
+                strokeDasharray="5 4"
+                dot={false}
+                connectNulls
+                isAnimationActive={false}
+              />
+            )}
+
+            <Line
+              type="monotone"
+              dataKey="trend"
+              stroke={CHART_COLORS.you}
+              strokeWidth={3}
+              strokeLinecap="round"
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+
+            {latest && data.length > 0 && (
+              <ReferenceDot
+                x={data[data.length - 1].label}
+                y={latest.value}
+                r={4.5}
+                fill={CHART_COLORS.you}
+                stroke="#fff"
+                strokeWidth={2}
+                label={<Callout text={latest.text} sub={latest.sub} />}
+              />
+            )}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-soft">
-        <Key color={CHART_COLORS.under} line>Trend</Key>
+        <Key color={CHART_COLORS.you} line>Trend</Key>
         <Key color={CHART_COLORS.dot} hollow>Weigh-ins</Key>
-        {goalChangeAt.length > 0 && (
-          <Key color={CHART_COLORS.reference} vertical>Goal changed</Key>
-        )}
+        {showPace && <Key color={CHART_COLORS.goal} line dashed>Goal pace</Key>}
       </ul>
-    )}
     </>
   );
 }
@@ -403,13 +402,12 @@ export function StrengthChart({ data, unit }: { data: StrengthPoint[]; unit: str
         />
         <Tooltip
           {...tooltipProps}
-          cursor={{ stroke: CHART_COLORS.reference, strokeDasharray: '4 4' }}
           formatter={(value) => [`${Number(value).toFixed(1)} ${unit}`, 'Est. 1RM']}
         />
         <Line
           type="monotone"
           dataKey="e1rm"
-          stroke={CHART_COLORS.under}
+          stroke={CHART_COLORS.you}
           strokeWidth={3}
           strokeLinecap="round"
           dot={{ r: 3.5, strokeWidth: 2, stroke: CHART_COLORS.dot, fill: '#fff' }}
@@ -421,3 +419,4 @@ export function StrengthChart({ data, unit }: { data: StrengthPoint[]; unit: str
     </div>
   );
 }
+
