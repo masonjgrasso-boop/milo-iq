@@ -3,17 +3,17 @@ import { useAuth } from '../context/auth-context';
 import { signOutUser } from '../lib/auth';
 import { formatHeight, formatWeight } from '../lib/units';
 import { ACTIVITY_LABELS } from '../lib/targets';
+import { GOAL_WORDS } from '../lib/goals';
 import { Button, Card, Divider } from '../components/ui';
 import { Page } from '../components/Layout';
 
-const GOAL_LABELS = {
-  lose: 'Losing weight',
-  maintain: 'Maintaining',
-  gain: 'Gaining weight',
-} as const;
-
 /** Everything that is not the profile itself, as one grouped list. */
 const LINKS = [
+  {
+    to: '/goals',
+    title: 'Goals',
+    sub: 'Change what you are aiming for, and at what pace',
+  },
   {
     to: '/maintenance',
     title: 'Maintenance',
@@ -55,7 +55,7 @@ export function More() {
         </div>
 
         <dl className="flex flex-col">
-          <Row label="Goal" value={GOAL_LABELS[profile.goal]} />
+          <Row label="Goal" value={GOAL_WORDS[profile.goal].label} />
           <Row label="Daily target" value={`${profile.calorieTarget.toLocaleString()} cal`} />
           <Row label="Height" value={formatHeight(profile.heightCm, profile.units)} />
           <Row label="Starting weight" value={formatWeight(profile.weightKg, profile.units)} />

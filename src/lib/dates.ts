@@ -108,6 +108,15 @@ export function shortDateLabel(key: DayKey): string {
   return fromDayKey(key).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+/** Short label carrying the year, such as "Mar 4, 2026". */
+export function fullDateLabel(key: DayKey): string {
+  return fromDayKey(key).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 /** "Today", "Yesterday", or a short date. */
 export function friendlyDayLabel(key: DayKey, today: DayKey = todayKey()): string {
   const diff = daysBetween(key, today);

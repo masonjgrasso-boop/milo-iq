@@ -8,14 +8,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ACTIVITY_LABELS, calculateCalorieTarget } from '../lib/targets';
-import {
-  gentlerRate, rateConcern, rateToKgPerWeek, safeMinimum, type RatePeriod,
-} from '../lib/rate';
+import { rateConcern, rateToKgPerWeek, PERIOD_WORDS, type RatePeriod } from '../lib/rate';
 import { feetInchesToCm, toKg, weightUnitLabel } from '../lib/units';
 import type { ActivityLevel, Goal, Sex, UnitSystem } from '../lib/types';
-import { Button, Card, Eyebrow, Field, NoteBox, OptionRow, Segmented, Stat, UnitInput } from './ui';
-
-const PERIOD_WORDS: Record<RatePeriod, string> = { week: 'a week', month: 'a month' };
+import { RateNote } from './RateNote';
+import { Button, Card, Eyebrow, Field, OptionRow, Segmented, Stat, UnitInput } from './ui';
 
 export function CalorieCalculator({ onClose }: { onClose: () => void }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -94,7 +91,6 @@ export function CalorieCalculator({ onClose }: { onClose: () => void }) {
 
   const unit = weightUnitLabel(units);
   const period = PERIOD_WORDS[ratePeriod];
-  const gentler = bodyValid ? gentlerRate(weightKg, ratePeriod, units) : 0;
   const losing = goal === 'lose';
 
   return (
@@ -311,23 +307,16 @@ export function CalorieCalculator({ onClose }: { onClose: () => void }) {
                   )}
 
                   {/* Gentle, and specific: both notes name a rate to try instead. */}
-                  {concern === 'below-minimum' && (
-                    <NoteBox tone="cream">
-                      {losing ? 'Losing' : 'Gaining'} {rate} {unit} {period} would put you
-                      under {safeMinimum(sex).toLocaleString()} calories a day, which is
-                      lower than we would suggest going. Your goal is being held at{' '}
-                      {result.calorieTarget.toLocaleString()} instead. Around {gentler}{' '}
-                      {unit} {period} is a pace you can actually hold.
-                    </NoteBox>
-                  )}
-
-                  {concern === 'aggressive' && (
-                    <NoteBox tone="cream">
-                      That is more than 1% of your body weight a week. It works, but it is
-                      hard to stick to and more of the change comes from muscle. Around{' '}
-                      {gentler} {unit} {period} tends to go better.
-                    </NoteBox>
-                  )}
+                  <RateNote
+                    concern={concern}
+                    goal={goal}
+                    rate={rate}
+                    units={units}
+                    period={ratePeriod}
+                    sex={sex}
+                    weightKg={weightKg}
+                    calorieTarget={result.calorieTarget}
+                  />
                 </Card>
               ) : (
                 <Card tone="muted">

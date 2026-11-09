@@ -14,6 +14,12 @@ export const WEEKS_PER_MONTH = 52 / 12;
 
 export type RatePeriod = 'week' | 'month';
 
+/** The period as it reads inside a sentence: "1 lb a week". */
+export const PERIOD_WORDS: Record<RatePeriod, string> = {
+  week: 'a week',
+  month: 'a month',
+};
+
 /**
  * A rate as typed, converted to kilograms per week.
  *

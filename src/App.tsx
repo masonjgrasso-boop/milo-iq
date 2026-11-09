@@ -24,6 +24,7 @@ const GroupDetail = lazy(() =>
   import('./pages/GroupDetail').then((m) => ({ default: m.GroupDetail })),
 );
 const Photos = lazy(() => import('./pages/Photos').then((m) => ({ default: m.Photos })));
+const Goals = lazy(() => import('./pages/Goals').then((m) => ({ default: m.Goals })));
 const Exercises = lazy(() => import('./pages/Exercises').then((m) => ({ default: m.Exercises })));
 const RoutineEditor = lazy(() =>
   import('./pages/RoutineEditor').then((m) => ({ default: m.RoutineEditor })),
@@ -108,6 +109,7 @@ export default function App() {
           <Route path="/more" element={<More />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/rules/edit" element={<RulesEditor />} />
+          <Route path="/goals" element={<Goals />} />
           <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/account" element={<Account />} />
           <Route path="/groups" element={<Groups />} />

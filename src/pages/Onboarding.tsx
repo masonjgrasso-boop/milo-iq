@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
 import { saveProfile } from '../lib/profile';
+import { todayKey } from '../lib/dates';
 import { feetInchesToCm, toKg, weightUnitLabel, lbToKg } from '../lib/units';
 import { ACTIVITY_LABELS, calculateCalorieTarget } from '../lib/targets';
 import type { ActivityLevel, Goal, Sex, UnitSystem, UserProfile } from '../lib/types';
@@ -75,10 +76,20 @@ export function Onboarding() {
     setSaving(true);
     setError(null);
 
+    const rate = goal === 'maintain' ? 0 : targetRateKgPerWeek;
+
     const profile: UserProfile = {
       units, heightCm, weightKg, age: ageYears, sex, goal, activity,
-      targetRateKgPerWeek: goal === 'maintain' ? 0 : targetRateKgPerWeek,
+      targetRateKgPerWeek: rate,
       calorieTarget: preview.calorieTarget,
+      // The first goal, dated from today, so there is never a stretch of logs
+      // with no goal attached to them. Changing goals later appends to this.
+      goalHistory: [{
+        startDate: todayKey(),
+        goal,
+        targetRateKgPerWeek: rate,
+        calorieTarget: preview.calorieTarget,
+      }],
     };
 
     try {

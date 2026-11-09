@@ -4,6 +4,7 @@
 // colour stay consistent and a change lands everywhere at once. Nothing here
 // knows about Firebase or app state.
 
+import { useEffect, useRef } from 'react';
 import type { ButtonHTMLAttributes, ComponentPropsWithRef, ReactNode } from 'react';
 
 /* ---------------------------------------------------------------- surfaces */
@@ -343,6 +344,85 @@ export function Spinner({ label = 'Loading' }: { label?: string }) {
     <div className="flex min-h-screen items-center justify-center text-ink-mute">
       <span className="h-6 w-6 animate-spin rounded-full border-2 border-line-in border-t-brand" />
       <span className="sr-only">{label}</span>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------- dialogs */
+
+/**
+ * A yes-or-no question: a bottom sheet on a phone, a centred dialog from lg
+ * up, which is the same shape the calculator arrives in so a modal always
+ * comes from the same place.
+ *
+ * Escape and the backdrop both cancel. A confirmation that is hard to back
+ * out of is a trap, and the whole point of asking is that the answer might
+ * be no.
+ */
+export function ConfirmDialog({
+  title, children, confirmLabel, cancelLabel = 'Cancel', busy = false, onConfirm, onCancel,
+}: {
+  title: string;
+  /** The body of the question. */
+  children: ReactNode;
+  confirmLabel: string;
+  cancelLabel?: string;
+  /** Disables both buttons while the write is in flight. */
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+
+  // Focus lands inside, so a keyboard or screen reader starts on the question
+  // rather than wherever it happened to be behind the sheet.
+  useEffect(() => {
+    panel.current?.focus();
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') onCancel();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  // Keep the page behind from scrolling under the sheet.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-30 flex items-end justify-center bg-ink/60 lg:items-center lg:p-6"
+      onClick={onCancel}
+    >
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+        tabIndex={-1}
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-md rounded-t-card bg-surface p-5 outline-none
+          lg:rounded-card lg:p-6"
+      >
+        <h2 id="confirm-title" className="display text-[26px] text-ink">
+          {title}
+        </h2>
+        <div className="mt-2.5 text-[15px] leading-snug text-ink-soft">{children}</div>
+
+        <div className="mt-5 flex gap-3">
+          <Button variant="secondary" onClick={onCancel} disabled={busy}>
+            {cancelLabel}
+          </Button>
+          <Button onClick={onConfirm} disabled={busy}>
+            {busy ? 'Saving…' : confirmLabel}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
