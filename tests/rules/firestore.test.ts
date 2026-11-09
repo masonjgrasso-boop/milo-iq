@@ -174,6 +174,49 @@ describe('a user and their own data', () => {
   it('can listen to its own day document', async () => {
     await assertSucceeds(getDoc(doc(asBob(), 'users', BOB, 'days', '2026-03-04')));
   });
+
+  // Goal history is a field on the profile document rather than a collection
+  // of its own, so it rides on the profile rule above. Asserted on purpose
+  // because it is the record that keeps each past day attached to the goal it
+  // was logged under: losing it would re-score months of logs.
+  const HISTORY = [
+    { startDate: '2026-01-01', goal: 'lose', targetRateKgPerWeek: 0.45, calorieTarget: 2000 },
+    { startDate: '2026-06-01', goal: 'gain', targetRateKgPerWeek: 0.2, calorieTarget: 2800 },
+  ];
+
+  it('can write and read back its own goal history', async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(asBob(), 'users', BOB),
+        { units: 'metric', goalHistory: HISTORY },
+        { merge: true },
+      ),
+    );
+    await assertSucceeds(getDoc(doc(asBob(), 'users', BOB)));
+  });
+
+  it('cannot rewrite another user’s goal history', async () => {
+    await assertFails(
+      setDoc(
+        doc(asAlice(), 'users', BOB),
+        { goalHistory: [{ startDate: '2026-01-01', goal: 'gain', calorieTarget: 9000 }] },
+        { merge: true },
+      ),
+    );
+    await assertFails(
+      setDoc(doc(asAnon(), 'users', BOB), { goalHistory: [] }, { merge: true }),
+    );
+  });
+
+  it('does not expose goal history through the group mirror', async () => {
+    // Alice coaches Bob's group and can read the summary he chose to publish.
+    // That mirror is a separate document, so his profile — and with it his
+    // goals, rate and body figures — stays shut to her.
+    await assertSucceeds(
+      getDoc(doc(asAlice(), 'groups', GROUP, 'members', BOB, 'shared', 'summary')),
+    );
+    await assertFails(getDoc(doc(asAlice(), 'users', BOB)));
+  });
 });
 
 describe('group documents', () => {

@@ -29,7 +29,8 @@ Three things follow from that:
 | **Quick calorie calculator** | Serving size + calories per serving + grams eaten → instant total; foods save for one-tap reuse |
 | **Daily log** | Calories and weight, with day, week and month views against target |
 | **Adaptive maintenance** | Measures what you actually burn from your own logs, with a confidence level |
-| **Catch-up guidance** | A gentle, bounded plan after a heavy few days |
+| **Change your goal** | Switch between losing, maintaining and gaining at any time; each past day stays judged against the goal you held that day |
+| **Catch-up guidance** | A gentle, bounded plan after a heavy few days, in whichever direction your goal points |
 | **Rules** | Daily yes/no, daily numeric, and weekly limits, with streaks |
 | **Workouts** | Sets, weight and reps, prefilled from last time |
 | **Strength graph** | Estimated 1RM, so more reps counts as progress too |
@@ -281,7 +282,7 @@ Two deliberate choices worth knowing about:
 - Invite codes can be looked up but not listed, so they cannot be enumerated.
 - Members write only their own membership record, so nobody can add someone else to a
   group or alter another member's share settings.
-- 56 rule tests run against the real emulator and assert the denials, not just the
+- 59 rule tests run against the real emulator and assert the denials, not just the
   permissions.
 - App Check can attest that requests come from your app rather than a script, and the
   web API key can be restricted to your own domains. Both are set up in step 10 and

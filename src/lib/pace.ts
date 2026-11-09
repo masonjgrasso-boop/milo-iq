@@ -169,7 +169,10 @@ export function paceFromTotals(input: PaceTotals): PaceSummary {
   // the sign for a gain goal is what makes "positive means behind" true for
   // everyone.
   const direction = goal === 'gain' ? -1 : 1;
-  const gapPerDay = daysLogged === 0 ? 0 : direction * (targetPerDay - actualPerDay);
+  const rawGap = direction * (targetPerDay - actualPerDay);
+  // Normalising -0, which flipping the sign of an exact zero produces and
+  // which then compares unequal to 0 everywhere downstream.
+  const gapPerDay = daysLogged === 0 || rawGap === 0 ? 0 : rawGap;
 
   const base: Omit<PaceSummary, 'status' | 'worthChasing'> = {
     daysLogged,
@@ -197,13 +200,20 @@ export function paceFromTotals(input: PaceTotals): PaceSummary {
       return actualPerDay < 0 ? 'above-maintenance' : 'under-maintenance';
     }
 
-    // On the wrong side of maintenance altogether, which is its own thing to
-    // say: not a shortfall against the plan but no progress at all. Gaining is
-    // the mirror image, and eating at maintenance counts for both.
+    // Meeting the plan is checked first, and deliberately so. A period that
+    // spans a goal change is measured against the blend of the two targets,
+    // which for someone who has just switched to gaining can still sit below
+    // maintenance. Checking the side of maintenance first would tell them
+    // they had made no progress on a period they ate exactly to plan.
+    if (gapPerDay <= 0) return 'ahead';
+
+    // Behind, and on the wrong side of maintenance altogether, which is its
+    // own thing to say: not a shortfall against the plan but no progress at
+    // all. Gaining is the mirror image, and sitting exactly at maintenance
+    // counts for both.
     if (goal === 'lose' && actualPerDay <= 0) return 'above-maintenance';
     if (goal === 'gain' && actualPerDay >= 0) return 'under-maintenance';
 
-    if (gapPerDay <= 0) return 'ahead';
     if (gapPerDay * daysLogged < MIN_WORTH_CHASING) return 'on-track';
     return 'behind';
   })();

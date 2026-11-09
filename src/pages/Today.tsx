@@ -9,7 +9,9 @@ import {
 } from '../lib/dates';
 import { formatWeight, fromKg, toKg, weightUnitLabel } from '../lib/units';
 import { planCatchUpForUser } from '../lib/catchup';
-import { describeAverage, progressToward, GOAL_WORDS } from '../lib/goals';
+import {
+  blendedTarget, describeAverage, goalOn, progressToward, GOAL_WORDS,
+} from '../lib/goals';
 import { estimateMaintenance, MAX_WINDOW_DAYS } from '../lib/maintenance';
 import { maintenanceBasis, paceSummary } from '../lib/pace';
 import { latestTrend, trendSeries } from '../lib/trend';
@@ -90,40 +92,59 @@ export function Today() {
   // Cheap filters over at most 31 days already in memory, so these sit below
   // the profile guard as plain values rather than memoised hooks.
   const basis = maintenanceBasis(maintenance, profile, latestWeightKg);
-  const paceFor = (start: string, end: string) =>
+  const goalPeriods = profile.goalHistory ?? [];
+
+  /**
+   * Where a span stands, measured against the target that was actually in
+   * force across it. A week containing a goal change is scored partly against
+   * each, so the days logged before the change keep their own yardstick.
+   */
+  const paceFor = (start: string, end: string, goal = profile!.goal) =>
     paceSummary({
       days: history ?? [],
       start,
       end,
       maintenanceCalories: basis.calories,
-      targetCalories: target,
-      goal: profile.goal,
+      targetCalories: blendedTarget(
+        (history ?? [])
+          .filter((past) => past.date >= start && past.date <= end && past.calories > 0)
+          .map((past) => past.date),
+        goalPeriods,
+        target,
+      ),
+      goal,
     });
 
   const today = todayKey();
   // Shown including today, so the card reflects what has just been logged.
+  // These describe where things stand now, so they use the current goal:
+  // any advice they carry has to point the way the user is now going.
   const weekPace = paceFor(startOfWeek(today), today);
   const monthPace = paceFor(startOfMonth(today), today);
   // The plan is built from completed days only: a day still in progress must
   // never be counted as a shortfall before dinner.
   const weekToDate = paceFor(startOfWeek(today), addDays(today, -1));
-  // Just the day on screen, for the deficit strip inside the hero.
-  const dayPace = paceFor(date, date);
+
+  // The strip inside the hero is about one day, so it is judged and labelled
+  // by the goal that was active on that day. Stepping back to a day from a
+  // deficit phase should read as a deficit, not as a failed surplus.
+  const dayGoal = goalOn(goalPeriods, date)?.goal ?? profile.goal;
+  const dayPace = paceFor(date, date, dayGoal);
 
   const catchUp = planCatchUpForUser(
     weekToDate.gapTotal, target, profile.sex, profile.goal,
   );
   const missedDays = (recentDays ?? []).filter((past) => past.calories === 0).length;
 
-  const words = GOAL_WORDS[profile.goal];
+  const words = GOAL_WORDS[dayGoal];
   const goalGap = Math.round(dayPace.targetPerDay);
   const actualGap = Math.round(dayPace.actualPerDay);
 
   // Both figures above are deficit-signed. Turning them round for a gain goal
   // is what lets one progress bar serve all three goals: filling up always
   // means moving the way you meant to.
-  const goalProgress = progressToward(profile.goal, goalGap);
-  const nowProgress = progressToward(profile.goal, actualGap);
+  const goalProgress = progressToward(dayGoal, goalGap);
+  const nowProgress = progressToward(dayGoal, actualGap);
   const progressPct = goalProgress > 0
     ? Math.max(0, Math.min(100, Math.round((nowProgress / goalProgress) * 100)))
     : 0;
@@ -132,7 +153,7 @@ export function Today() {
 
   /** One line under the progress bar, saying where the day stands. */
   function dayNote(): string {
-    if (profile!.goal === 'maintain') {
+    if (dayGoal === 'maintain') {
       return `${describeAverage(actualGap)} so far today. Holding near the line is the goal.`;
     }
     if (nowProgress < 0) {
@@ -278,6 +299,7 @@ export function Today() {
           plan={catchUp}
           week={weekToDate}
           month={monthPace}
+          target={target}
           missedDays={missedDays}
         />
       )}

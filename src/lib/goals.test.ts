@@ -3,6 +3,7 @@ import {
   appendGoalPeriod, blendedTarget, describeAverage, goalChangeIndices, goalOn,
   goalsDiffer, recordGoalChange, sortGoals, GOAL_WORDS,
 } from './goals';
+import { paceFromTotals } from './pace';
 import type { GoalPeriod } from './types';
 
 const losing: GoalPeriod = {
@@ -193,5 +194,72 @@ describe('describeAverage', () => {
 
   it('groups thousands, as every other number in the app does', () => {
     expect(describeAverage(1250)).toBe('1,250 below maintenance');
+  });
+});
+
+// The point of all of the above, composed the way Trends and Today compose it.
+describe('a period that spans a goal change', () => {
+  const maintenanceCalories = 2500;
+
+  /** What a screen does: blend the targets, then score the totals. */
+  function score(dates: string[], totalCalories: number, goal: 'lose' | 'gain') {
+    return paceFromTotals({
+      totalCalories,
+      daysLogged: dates.length,
+      maintenanceCalories,
+      targetCalories: blendedTarget(dates, history, 0),
+      goal,
+    });
+  }
+
+  it('does not count old deficit days against a new gain goal', () => {
+    // Two days on the old 2,000 deficit target, eaten exactly; two on the new
+    // 2,800 surplus target, eaten exactly. That is four days to plan.
+    const dates = ['2026-03-13', '2026-03-14', '2026-03-15', '2026-03-16'];
+    const summary = score(dates, 2000 + 2000 + 2800 + 2800, 'gain');
+
+    expect(summary.gapPerDay).toBe(0);
+    expect(summary.status).toBe('ahead');
+    // And specifically not the mirror-image complaint: the average does sit
+    // below maintenance, but only because half the period predates the goal.
+    expect(summary.actualPerDay).toBeGreaterThan(0);
+    expect(summary.status).not.toBe('under-maintenance');
+    expect(summary.worthChasing).toBe(false);
+  });
+
+  it('still reports a real shortfall across the change', () => {
+    const dates = ['2026-03-14', '2026-03-15'];
+    // 300 a day short of the 2,400 blend.
+    const summary = score(dates, 2100 + 2100, 'gain');
+
+    expect(summary.gapPerDay).toBe(300);
+    expect(summary.worthChasing).toBe(true);
+  });
+
+  it('judges a period entirely inside one goal on that goal alone', () => {
+    const dates = ['2026-04-01', '2026-04-02'];
+    const summary = score(dates, 2800 + 2800, 'gain');
+
+    expect(summary.targetCalories).toBe(2800);
+    expect(summary.gapPerDay).toBe(0);
+  });
+
+  it('is unaffected for someone who never changed goals', () => {
+    const withHistory = paceFromTotals({
+      totalCalories: 4000,
+      daysLogged: 2,
+      maintenanceCalories,
+      targetCalories: blendedTarget(['2026-04-01', '2026-04-02'], [], 2000),
+      goal: 'lose',
+    });
+    const without = paceFromTotals({
+      totalCalories: 4000,
+      daysLogged: 2,
+      maintenanceCalories,
+      targetCalories: 2000,
+      goal: 'lose',
+    });
+
+    expect(withHistory).toEqual(without);
   });
 });

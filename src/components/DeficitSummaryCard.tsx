@@ -73,17 +73,24 @@ function verdict(
   );
 }
 
-export function DeficitSummaryCard({ pace, range, sex, goal }: {
+export function DeficitSummaryCard({ pace, range, sex, goal, target }: {
   pace: PaceSummary;
   range: TrendRange;
   sex: Sex;
   /** The goal in force now, which is what the labels describe. */
   goal: Goal;
+  /**
+   * Today's daily target. Distinct from `pace.targetCalories`, which is the
+   * blend the period was actually measured against: the plan is advice about
+   * the days ahead, so it adjusts the target you are on now, not an average
+   * of targets some of which you have already left behind.
+   */
+  target: number;
 }) {
   const safeMinimum = SAFE_MIN_CALORIES[sex];
   const plan = pace.worthChasing
-    ? planRecovery(pace.gapPerDay, pace.gapTotal, pace.targetCalories, sex, goal)
-    : planRecovery(0, 0, pace.targetCalories, sex, goal);
+    ? planRecovery(pace.gapPerDay, pace.gapTotal, target, sex, goal)
+    : planRecovery(0, 0, target, sex, goal);
   const onTrack = !plan.needed;
 
   // Positive means the average moved the way the goal wanted. The label names
@@ -110,7 +117,7 @@ export function DeficitSummaryCard({ pace, range, sex, goal }: {
       </div>
 
       <p className="text-sm text-ink-soft">
-        {verdict(pace, plan, safeMinimum, pace.targetCalories)}
+        {verdict(pace, plan, safeMinimum, target)}
       </p>
 
       {/* The maintenance figure itself is named in the box above, so this says

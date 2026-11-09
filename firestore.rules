@@ -37,6 +37,11 @@ service cloud.firestore {
     // ---- A user's own data -------------------------------------------------
 
     match /users/{uid} {
+      // The profile document, which also carries the goal history: every goal
+      // the user has held, with the day it started. That is a field on this
+      // document rather than a collection of its own, so it is governed by
+      // this rule and nothing further is needed. It is private either way -
+      // a group only ever reads the mirror a member publishes, never this.
       allow read, write: if isOwner(uid);
 
       // Everything under a user is theirs alone: days, weeks, months, foods,

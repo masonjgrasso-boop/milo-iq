@@ -26,6 +26,12 @@ interface Props {
   week: PaceSummary;
   /** This month's standing — the reassuring context. */
   month: PaceSummary;
+  /**
+   * Today's daily target, which is what the plan moves. The week's own figure
+   * may be a blend of two goals if one changed mid-week, and quoting that as
+   * the number being replaced would name a target the user is not on.
+   */
+  target: number;
   missedDays: number;
 }
 
@@ -64,7 +70,7 @@ function monthIsProgress(month: PaceSummary): boolean {
   return month.goal === 'gain' ? month.actualTotal < 0 : month.actualTotal > 0;
 }
 
-export function CatchUpCard({ plan, week, month, missedDays }: Props) {
+export function CatchUpCard({ plan, week, month, target, missedDays }: Props) {
   const progress = progressLine(month);
   const needsPlan = plan.needed && week.worthChasing;
   const more = plan.fix === 'eat-more';
@@ -124,7 +130,7 @@ export function CatchUpCard({ plan, week, month, missedDays }: Props) {
           day for {plan.days} {plan.days === 1 ? 'day' : 'days'}
         </strong>{' '}
         — a target of {plan.adjustedTarget.toLocaleString()} instead of{' '}
-        {week.targetCalories.toLocaleString()}.
+        {target.toLocaleString()}.
       </p>
 
       <dl className="mt-3 space-y-1 border-t border-brand-pill pt-3 text-xs text-brand">

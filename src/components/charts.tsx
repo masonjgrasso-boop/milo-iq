@@ -96,13 +96,17 @@ function DeficitBar(props: {
  * There is no left axis — the goal line carries its own number, which buys
  * back about fifty pixels of plot on a phone.
  */
-export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
+export function DeficitChart({
+  data, goalDeficit, ticks, dense = false, goalChangeAt = [],
+}: {
   data: DeficitPoint[];
   goalDeficit: number;
   /** One entry per bar; an empty string leaves that bar unlabelled. */
   ticks: string[];
   /** Month and year views pack the bars tighter. */
   dense?: boolean;
+  /** Bars where a new goal started, as indices into `data`. */
+  goalChangeAt?: number[];
 }) {
   return (
     <>
@@ -138,6 +142,19 @@ export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
             strokeWidth={2}
             ifOverflow="extendDomain"
           />
+          {/* Where the goal changed. An annotation rather than a series: the
+              bars either side are measured against different targets, and
+              without this the step in the dashed goal line looks like a bug.
+              Vertical, so it cannot be mistaken for the goal line itself. */}
+          {goalChangeAt.map((index) => (
+            <ReferenceLine
+              key={`goal-${index}`}
+              x={data[index]?.label}
+              stroke={CHART_COLORS.reference}
+              strokeDasharray="3 3"
+              strokeWidth={1.5}
+            />
+          ))}
           <Bar dataKey="deficit" shape={<DeficitBar />} isAnimationActive={false} />
           <Line
             type="monotone"
@@ -163,19 +180,42 @@ export function DeficitChart({ data, goalDeficit, ticks, dense = false }: {
         <Key color={CHART_COLORS.reference} line dashed>
           Goal ({goalDeficit.toLocaleString()} cal)
         </Key>
+        {goalChangeAt.length > 0 && (
+          <Key color={CHART_COLORS.reference} vertical>Goal changed</Key>
+        )}
       </ul>
     </>
   );
 }
 
-function Key({ color, line = false, dashed = false, hollow = false, children }: {
+function Key({
+  color, line = false, dashed = false, hollow = false, vertical = false, children,
+}: {
   color: string;
   line?: boolean;
   dashed?: boolean;
   /** A ring rather than a fill, matching an unfilled weigh-in dot. */
   hollow?: boolean;
+  /** An upright dashed tick, matching a goal-change marker. */
+  vertical?: boolean;
   children: ReactNode;
 }) {
+  if (vertical) {
+    return (
+      <li className="flex items-center gap-1.5">
+        <span
+          aria-hidden="true"
+          className="h-3.5 w-0.5"
+          style={{
+            backgroundImage:
+              `repeating-linear-gradient(to bottom, ${color} 0 3px, transparent 3px 6px)`,
+          }}
+        />
+        {children}
+      </li>
+    );
+  }
+
   if (hollow) {
     return (
       <li className="flex items-center gap-1.5">
@@ -220,12 +260,16 @@ export interface WeightPoint {
  * smoothed trend drawn thick on top. The trend is the one to read, so it is
  * the one that carries the weight of the ink.
  */
-export function WeightChart({ data, unit, ticks, showTrend = false }: {
+export function WeightChart({
+  data, unit, ticks, showTrend = false, goalChangeAt = [],
+}: {
   data: WeightPoint[];
   unit: string;
   /** Same labels as the chart above it, so the two axes line up. */
   ticks: string[];
   showTrend?: boolean;
+  /** Points where a new goal started, as indices into `data`. */
+  goalChangeAt?: number[];
 }) {
   return (
     <>
@@ -250,6 +294,15 @@ export function WeightChart({ data, unit, ticks, showTrend = false }: {
             name === 'trend' ? 'Trend' : 'Weighed',
           ]}
         />
+        {goalChangeAt.map((index) => (
+          <ReferenceLine
+            key={`goal-${index}`}
+            x={data[index]?.label}
+            stroke={CHART_COLORS.reference}
+            strokeDasharray="3 3"
+            strokeWidth={1.5}
+          />
+        ))}
         <Line
           type="monotone"
           dataKey="weight"
@@ -280,6 +333,9 @@ export function WeightChart({ data, unit, ticks, showTrend = false }: {
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-soft">
         <Key color={CHART_COLORS.under} line>Trend</Key>
         <Key color={CHART_COLORS.dot} hollow>Weigh-ins</Key>
+        {goalChangeAt.length > 0 && (
+          <Key color={CHART_COLORS.reference} vertical>Goal changed</Key>
+        )}
       </ul>
     )}
     </>

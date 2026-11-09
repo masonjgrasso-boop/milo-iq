@@ -13,7 +13,9 @@ import { useWeekSummaries } from '../hooks/useWeekSummaries';
 import {
   addDays, shortDateLabel, todayKey, toWeekKey, weekKeyToMonday, weekdayLabel,
 } from '../lib/dates';
-import { describeAverage, GOAL_WORDS } from '../lib/goals';
+import {
+  blendedTarget, describeAverage, goalChangeIndices, GOAL_WORDS,
+} from '../lib/goals';
 import { MAX_WINDOW_DAYS, type MaintenanceResult } from '../lib/maintenance';
 import { paceFromTotals, type MaintenanceBasis, type PaceSummary } from '../lib/pace';
 import {
@@ -79,7 +81,19 @@ function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }
     basis.calories,
     range === 'week' ? weekdayLabel : shortDateLabel,
   );
-  const ticks = axisTicks(inRange.map((day) => day.date), range);
+  const dates = inRange.map((day) => day.date);
+  const ticks = axisTicks(dates, range);
+
+  // Only the days that were logged are scored, so only they decide the target
+  // this period is measured against. A period straddling a goal change gets
+  // the days-weighted blend of the two, which is what stops a month of
+  // deficit days being graded against a gain goal taken up last week.
+  const history = profile.goalHistory ?? [];
+  const target = blendedTarget(
+    inRange.filter((day) => day.calories > 0).map((day) => day.date),
+    history,
+    profile.calorieTarget,
+  );
 
   const trend = trendSeries(inRange);
   const weightPoints: WeightPoint[] = trend.map((point) => ({
@@ -97,9 +111,10 @@ function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }
       basis={basis}
       points={points}
       ticks={ticks}
-      pace={paceFor(sumDays(inRange), basis, profile)}
+      pace={paceFor(sumDays(inRange), basis, profile, target)}
       weightPoints={weightPoints}
       weightChangeKg={trendChangeKg(trend)}
+      goalChangeAt={goalChangeIndices(dates, history)}
     />
   );
 }
@@ -127,6 +142,17 @@ function YearView({ profile }: { profile: UserProfile }) {
 
   // A week's average weight is the right dot at this zoom.
   const byKey = new Map(found.map((week) => [week.key, week]));
+
+  // Blended by week rather than by day here, since that is the resolution
+  // this view reads at. A week containing a goal change is attributed to
+  // whichever goal its Monday fell under, which is coarse but never wrong by
+  // more than the one week.
+  const history = profile.goalHistory ?? [];
+  const target = blendedTarget(
+    mondays.filter((_, index) => (byKey.get(keys[index])?.daysLogged ?? 0) > 0),
+    history,
+    profile.calorieTarget,
+  );
   const trend = trendSeries(
     keys.map((key, index) => ({
       date: mondays[index],
@@ -148,9 +174,10 @@ function YearView({ profile }: { profile: UserProfile }) {
       basis={basis}
       points={points}
       ticks={ticks}
-      pace={paceFor(sumWeeks(found), basis, profile)}
+      pace={paceFor(sumWeeks(found), basis, profile, target)}
       weightPoints={weightPoints}
       weightChangeKg={trendChangeKg(trend)}
+      goalChangeAt={goalChangeIndices(mondays, history)}
       dense
     />
   );
@@ -160,11 +187,15 @@ function paceFor(
   totals: { totalCalories: number; daysLogged: number },
   basis: MaintenanceBasis,
   profile: UserProfile,
+  /** The blended target for the period, which may span more than one goal. */
+  targetCalories: number,
 ): PaceSummary {
   return paceFromTotals({
     ...totals,
     maintenanceCalories: basis.calories,
-    targetCalories: profile.calorieTarget,
+    targetCalories,
+    // The goal in force now is what the labels describe, even for a period
+    // that began under a different one. This screen reads as "where am I".
     goal: profile.goal,
   });
 }
@@ -177,7 +208,7 @@ function toDisplay(kg: number | null | undefined, profile: UserProfile): number 
 
 function Body({
   loading, range, profile, result, basis, points, ticks, pace, weightPoints, weightChangeKg,
-  dense = false,
+  goalChangeAt, dense = false,
 }: {
   loading: boolean;
   range: TrendRange;
@@ -189,6 +220,8 @@ function Body({
   pace: PaceSummary;
   weightPoints: WeightPoint[];
   weightChangeKg: number | null;
+  /** Buckets where a new goal started. */
+  goalChangeAt: number[];
   dense?: boolean;
 }) {
   if (loading) {
@@ -223,6 +256,7 @@ function Body({
                 data={weightPoints}
                 unit={weightUnitLabel(profile.units)}
                 ticks={ticks}
+                goalChangeAt={goalChangeAt}
                 showTrend
               />
             )}
@@ -237,6 +271,7 @@ function Body({
               data={points}
               goalDeficit={pace.targetPerDay}
               ticks={ticks}
+              goalChangeAt={goalChangeAt}
               dense={dense}
             />
             <NoteBox tone="cream">
@@ -251,6 +286,7 @@ function Body({
             range={range}
             sex={profile.sex}
             goal={profile.goal}
+            target={profile.calorieTarget}
           />
         </>
       )}
