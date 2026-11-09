@@ -13,6 +13,7 @@ import { useWeekSummaries } from '../hooks/useWeekSummaries';
 import {
   addDays, shortDateLabel, todayKey, toWeekKey, weekKeyToMonday, weekdayLabel,
 } from '../lib/dates';
+import { describeAverage, GOAL_WORDS } from '../lib/goals';
 import { MAX_WINDOW_DAYS, type MaintenanceResult } from '../lib/maintenance';
 import { paceFromTotals, type MaintenanceBasis, type PaceSummary } from '../lib/pace';
 import {
@@ -228,7 +229,10 @@ function Body({
           </Card>
 
           <Card className="flex flex-col gap-3.5">
-            <ChartHeading label="Daily deficit" headline={deficitLine(pace, range)} />
+            <ChartHeading
+              label={GOAL_WORDS[profile.goal].chart}
+              headline={deficitLine(pace, range)}
+            />
             <DeficitChart
               data={points}
               goalDeficit={pace.targetPerDay}
@@ -236,12 +240,18 @@ function Body({
               dense={dense}
             />
             <NoteBox tone="cream">
-              An over day is just one bar. The average line is the one to watch.
+              {GOAL_WORDS[profile.goal].offDay} is just one bar. The average line is the
+              one to watch.
             </NoteBox>
           </Card>
           </div>
 
-          <DeficitSummaryCard pace={pace} range={range} sex={profile.sex} />
+          <DeficitSummaryCard
+            pace={pace}
+            range={range}
+            sex={profile.sex}
+            goal={profile.goal}
+          />
         </>
       )}
     </>
@@ -258,14 +268,19 @@ function ChartHeading({ label, headline }: { label: string; headline: string }) 
   );
 }
 
-/** The deficit chart's own headline, in the same shape as the weight one. */
+/**
+ * The deficit chart's own headline, in the same shape as the weight one.
+ *
+ * Says which side of maintenance the average sits on and leaves the judgement
+ * to the summary card below, so the same sentence works for a deficit, a
+ * surplus or holding steady.
+ */
 function deficitLine(pace: PaceSummary, range: TrendRange): string {
   const when = RANGE_LABELS[range];
-  const amount = Math.abs(Math.round(pace.actualPerDay)).toLocaleString();
-
-  if (pace.actualPerDay > 0) return `Averaging ${amount} under maintenance over ${when}.`;
-  if (pace.actualPerDay === 0) return `Sitting right at maintenance over ${when}.`;
-  return `Averaging ${amount} over maintenance across ${when}.`;
+  if (Math.round(pace.actualPerDay) === 0) {
+    return `Sitting right at maintenance over ${when}.`;
+  }
+  return `Averaging ${describeAverage(pace.actualPerDay)} over ${when}.`;
 }
 
 function weightLine(

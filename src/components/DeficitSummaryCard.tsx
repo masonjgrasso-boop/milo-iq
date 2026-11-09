@@ -3,19 +3,23 @@
 // "Status" is a verdict rather than a figure, so it gets the third tile and a
 // sentence of its own underneath — a recovery instruction crammed into a stat
 // tile is unreadable on a phone.
+//
+// The verdict reads differently for each goal. Someone gaining who under-ate
+// is just as behind as someone losing who over-ate, but the fix points the
+// other way, so the sentence is built from the plan's own direction rather
+// than assuming a deficit.
 
 import { planRecovery, RECOVERY_DAYS, type CatchUpPlan } from '../lib/catchup';
 import { RANGE_LABELS, type TrendRange } from '../lib/deficit';
+import { describeAverage, progressToward, GOAL_GAP_LABEL } from '../lib/goals';
 import type { PaceSummary } from '../lib/pace';
 import { SAFE_MIN_CALORIES } from '../lib/targets';
-import type { Sex } from '../lib/types';
+import type { Goal, Sex } from '../lib/types';
 import { Card, Stat } from './ui';
 
 const cal = (value: number): string => Math.abs(Math.round(value)).toLocaleString();
 
-/** A number above maintenance is shown with a plus, as elsewhere in the app. */
-const signed = (value: number): string => `${value >= 0 ? '' : '+'}${cal(value)}`;
-
+/** The one line that says where things stand and what, if anything, to do. */
 function verdict(
   pace: PaceSummary,
   plan: CatchUpPlan,
@@ -23,17 +27,34 @@ function verdict(
   target: number,
 ): string {
   if (!plan.needed) {
-    return pace.goal === 'maintain'
-      ? 'You are sitting where you meant to. Nothing to change.'
+    if (pace.goal === 'maintain') {
+      return pace.status === 'on-track'
+        ? 'You are sitting where you meant to. Nothing to change.'
+        : `Your average is ${describeAverage(pace.actualPerDay)}, which is further from ` +
+          'maintenance than holding steady needs. Nudging it back brings you level.';
+    }
+    return pace.goal === 'gain'
+      ? 'Your average is meeting the surplus your goal asks for. Keep going.'
       : 'Your average is meeting the deficit your goal asks for. Keep going.';
   }
 
-  // The target is already as low as we would ever recommend.
+  // Eating more has no safe floor to run into, so this branch only ever
+  // applies to a target already as low as we would recommend going.
   if (plan.dailyAdjustment === 0) {
     return (
       `Your target is already at the lowest we would recommend, so there is nothing ` +
       `safe to trim. Carry on as normal and the trend absorbs this.`
     );
+  }
+
+  if (plan.fix === 'eat-more') {
+    const extra = `eat ${cal(plan.dailyAdjustment)} more calories a day`;
+    const to = `a target of ${cal(plan.adjustedTarget)} instead of ${cal(target)}`;
+    return plan.fullyCovered
+      ? `To get back on track in ${RECOVERY_DAYS} days, ${extra} — ${to}.`
+      : `To get back on track, ${extra} for the next ${plan.days} days — ${to}. We are ` +
+        `not chasing all of it: adding more than that in a day stops being food and ` +
+        `starts being a challenge.`;
   }
 
   if (plan.days > RECOVERY_DAYS) {
@@ -52,25 +73,34 @@ function verdict(
   );
 }
 
-export function DeficitSummaryCard({ pace, range, sex }: {
+export function DeficitSummaryCard({ pace, range, sex, goal }: {
   pace: PaceSummary;
   range: TrendRange;
   sex: Sex;
+  /** The goal in force now, which is what the labels describe. */
+  goal: Goal;
 }) {
   const safeMinimum = SAFE_MIN_CALORIES[sex];
   const plan = pace.worthChasing
-    ? planRecovery(pace.gapPerDay, pace.gapTotal, pace.targetCalories, sex)
-    : planRecovery(0, 0, pace.targetCalories, sex);
+    ? planRecovery(pace.gapPerDay, pace.gapTotal, pace.targetCalories, sex, goal)
+    : planRecovery(0, 0, pace.targetCalories, sex, goal);
   const onTrack = !plan.needed;
+
+  // Positive means the average moved the way the goal wanted. The label names
+  // the side of maintenance, so the figure itself stays a magnitude.
+  const progress = progressToward(goal, pace.actualPerDay);
 
   return (
     <Card className="flex flex-col gap-3.5">
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="Goal deficit" value={signed(pace.targetPerDay)} />
         <Stat
-          label="Your average"
-          value={signed(pace.actualPerDay)}
-          tone={pace.actualPerDay > 0 ? 'good' : 'warn'}
+          label={GOAL_GAP_LABEL[goal]}
+          value={goal === 'maintain' ? 'Maintenance' : cal(pace.targetPerDay)}
+        />
+        <Stat
+          label={pace.actualPerDay >= 0 ? 'Avg. below maint.' : 'Avg. above maint.'}
+          value={cal(pace.actualPerDay)}
+          tone={progress > 0 ? 'good' : 'warn'}
         />
         <Stat
           label="Status"

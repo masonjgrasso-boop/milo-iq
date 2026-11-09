@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   mifflinStJeorBmr, estimateTdee, dailyCalorieDelta, calculateCalorieTarget,
-  SAFE_MIN_CALORIES, KCAL_PER_KG, suggestedTarget,
+  SAFE_MIN_CALORIES, KCAL_PER_KG, suggestedTarget, targetFromMaintenance,
 } from './targets';
 
 const male = { weightKg: 80, heightCm: 180, age: 30, sex: 'male' as const };
@@ -110,5 +110,49 @@ describe('suggestedTarget', () => {
       sex: 'male', goal: 'lose', targetRateKgPerWeek: 1,
     });
     expect(target).toBe(SAFE_MIN_CALORIES.male);
+  });
+});
+
+describe('targetFromMaintenance', () => {
+  const man = { sex: 'male' as const, targetRateKgPerWeek: 0.45 };
+
+  it('puts a lose goal below the maintenance figure it was given', () => {
+    const result = targetFromMaintenance(2800, { ...man, goal: 'lose' });
+    // 0.45 kg a week is 3,465 calories, or 495 a day.
+    expect(result.tdee).toBe(2800);
+    expect(result.calorieTarget).toBe(2305);
+    expect(result.clampedToFloor).toBe(false);
+  });
+
+  it('puts a gain goal above it by the same amount', () => {
+    expect(targetFromMaintenance(2800, { ...man, goal: 'gain' }).calorieTarget).toBe(3295);
+  });
+
+  it('leaves a maintain goal on the figure itself, whatever rate is passed', () => {
+    const result = targetFromMaintenance(2800, { ...man, goal: 'maintain' });
+    expect(result.calorieTarget).toBe(2800);
+  });
+
+  it('holds at the safe floor and says so', () => {
+    const result = targetFromMaintenance(1700, {
+      sex: 'female', goal: 'lose', targetRateKgPerWeek: 1,
+    });
+    expect(result.calorieTarget).toBe(SAFE_MIN_CALORIES.female);
+    expect(result.clampedToFloor).toBe(true);
+  });
+
+  it('is what suggestedTarget reports, so the two can never disagree', () => {
+    for (const goal of ['lose', 'maintain', 'gain'] as const) {
+      expect(suggestedTarget(2750, { ...man, goal }))
+        .toBe(targetFromMaintenance(2750, { ...man, goal }).calorieTarget);
+    }
+  });
+
+  it('keeps a measured maintenance figure instead of re-guessing it', () => {
+    // The formula for this body lands well under 2,900; anchoring to the
+    // measurement is the whole point of this function.
+    const measured = 2900;
+    expect(targetFromMaintenance(measured, { ...man, goal: 'maintain' }).calorieTarget)
+      .toBe(measured);
   });
 });

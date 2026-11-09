@@ -9,6 +9,7 @@ import {
 } from '../lib/dates';
 import { formatWeight, fromKg, toKg, weightUnitLabel } from '../lib/units';
 import { planCatchUpForUser } from '../lib/catchup';
+import { describeAverage, progressToward, GOAL_WORDS } from '../lib/goals';
 import { estimateMaintenance, MAX_WINDOW_DAYS } from '../lib/maintenance';
 import { maintenanceBasis, paceSummary } from '../lib/pace';
 import { latestTrend, trendSeries } from '../lib/trend';
@@ -109,23 +110,39 @@ export function Today() {
   // Just the day on screen, for the deficit strip inside the hero.
   const dayPace = paceFor(date, date);
 
-  const catchUp = planCatchUpForUser(weekToDate.gapTotal, target, profile.sex);
+  const catchUp = planCatchUpForUser(
+    weekToDate.gapTotal, target, profile.sex, profile.goal,
+  );
   const missedDays = (recentDays ?? []).filter((past) => past.calories === 0).length;
 
-  const goalDeficit = Math.round(dayPace.targetPerDay);
-  const deficitNow = Math.round(dayPace.actualPerDay);
-  const deficitPct = goalDeficit > 0
-    ? Math.max(0, Math.min(100, Math.round((deficitNow / goalDeficit) * 100)))
-    : 0;
+  const words = GOAL_WORDS[profile.goal];
+  const goalGap = Math.round(dayPace.targetPerDay);
+  const actualGap = Math.round(dayPace.actualPerDay);
 
-  /** One line under the deficit bar, saying where the day stands. */
-  function deficitNote(): string {
-    if (deficitNow < 0) {
-      return 'Above maintenance so far today. One day is not the trend.';
+  // Both figures above are deficit-signed. Turning them round for a gain goal
+  // is what lets one progress bar serve all three goals: filling up always
+  // means moving the way you meant to.
+  const goalProgress = progressToward(profile.goal, goalGap);
+  const nowProgress = progressToward(profile.goal, actualGap);
+  const progressPct = goalProgress > 0
+    ? Math.max(0, Math.min(100, Math.round((nowProgress / goalProgress) * 100)))
+    : 0;
+  // Maintaining asks for no gap at all, so there is no bar to fill.
+  const chasing = goalProgress > 0;
+
+  /** One line under the progress bar, saying where the day stands. */
+  function dayNote(): string {
+    if (profile!.goal === 'maintain') {
+      return `${describeAverage(actualGap)} so far today. Holding near the line is the goal.`;
     }
-    if (goalDeficit <= 0) return 'Maintaining, so there is no deficit to chase.';
-    if (deficitNow >= goalDeficit) return 'That is today’s goal already covered.';
-    return `${cal(goalDeficit - deficitNow)} more to reach today’s goal.`;
+    if (nowProgress < 0) {
+      return words.fix === 'eat-more'
+        ? 'Below maintenance so far today. One day is not the trend.'
+        : 'Above maintenance so far today. One day is not the trend.';
+    }
+    if (!chasing) return 'Nothing to chase today.';
+    if (nowProgress >= goalProgress) return 'That is today’s goal already covered.';
+    return `${cal(goalProgress - nowProgress)} more to reach today’s goal.`;
   }
 
   async function handleSaveWeight() {
@@ -223,20 +240,24 @@ export function Today() {
             <div className="flex flex-col gap-2">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-sm font-bold">
-                  {isToday ? 'Today’s deficit' : 'That day’s deficit'}
+                  {isToday ? 'Today’s' : 'That day’s'} {words.gap}
                 </span>
                 <span className="text-sm">
-                  <b className="tnum text-lg">{cal(deficitNow)}</b>{' '}
-                  <span className="opacity-75">/ {cal(goalDeficit)} goal</span>
+                  <b className="tnum text-lg">{cal(nowProgress)}</b>
+                  {chasing && (
+                    <span className="opacity-75"> / {cal(goalProgress)} goal</span>
+                  )}
                 </span>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
-                <div
-                  className="h-full rounded-full bg-surface transition-all"
-                  style={{ width: `${deficitPct}%` }}
-                />
-              </div>
-              <p className="text-xs opacity-80">{deficitNote()}</p>
+              {chasing && (
+                <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
+                  <div
+                    className="h-full rounded-full bg-surface transition-all"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+              )}
+              <p className="text-xs opacity-80">{dayNote()}</p>
             </div>
           </>
         )}

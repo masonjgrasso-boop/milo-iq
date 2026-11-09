@@ -8,6 +8,23 @@ export type Sex = 'male' | 'female';
 export type Goal = 'lose' | 'maintain' | 'gain';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'very';
 
+/**
+ * One goal and the day it started.
+ *
+ * Kept so that a day already logged is always judged against the goal that
+ * was active on it. Someone who spent March in a deficit and then switched to
+ * gaining has not failed at gaining in March.
+ */
+export interface GoalPeriod {
+  /** The first day this goal counts for. */
+  startDate: DayKey;
+  goal: Goal;
+  /** Positive magnitude, as on the profile. 0 when maintaining. */
+  targetRateKgPerWeek: number;
+  /** The daily calorie target this goal was saved with. */
+  calorieTarget: number;
+}
+
 export interface UserProfile {
   units: UnitSystem;
   heightCm: number;
@@ -20,6 +37,15 @@ export interface UserProfile {
   targetRateKgPerWeek: number;
   /** Starting daily calorie target. Phase 3 replaces this with a measured one. */
   calorieTarget: number;
+  /**
+   * Every goal this user has held, oldest first, including the current one.
+   *
+   * Stored on the profile rather than in its own collection because the
+   * profile is already read once at start-up and handed to every screen, so
+   * history costs no extra query anywhere it is needed. Absent for anyone who
+   * has never changed goals.
+   */
+  goalHistory?: GoalPeriod[];
   createdAt?: unknown;
   updatedAt?: unknown;
 }

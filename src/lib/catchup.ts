@@ -2,18 +2,58 @@
 //
 // The failure mode this whole app exists to prevent: one heavy weekend, a
 // feeling of having blown it, and the user stops logging altogether. So the
-// plan here is deliberately gentle. It spreads the excess across several days
-// rather than demanding one punishing day, it never recommends eating below a
-// safe minimum, and when the excess is too large to undo comfortably it says
-// so and lets the rest go instead of inventing a crash diet.
+// plan here is deliberately gentle. It spreads the shortfall across several
+// days rather than demanding one punishing day, it never recommends eating
+// below a safe minimum, and when the shortfall is too large to undo
+// comfortably it says so and lets the rest go instead of inventing a crash
+// diet.
+//
+// It works in both directions. Someone gaining who under-ate is just as
+// behind as someone losing who over-ate, and the same gentleness applies: the
+// suggestion is a bit more food each day for a while, capped so it never
+// becomes an eating contest.
 
+import { GOAL_WORDS } from './goals';
 import { SAFE_MIN_CALORIES } from './targets';
-import type { DayLog, Sex } from './types';
+import type { DayLog, Goal, Sex } from './types';
 
 /** The adjustment is spread across at least this many days. */
 export const MIN_SPREAD_DAYS = 3;
 /** And at most this many, after which the excess stops being worth chasing. */
 export const MAX_SPREAD_DAYS = 7;
+
+/**
+ * Which way a shortfall is put right.
+ *
+ * Someone short of a deficit eats less; someone short of a surplus eats more.
+ * They are not symmetrical in how they can go wrong, which is why they are
+ * bounded differently below.
+ */
+export type CatchUpFix = 'eat-less' | 'eat-more';
+
+/**
+ * The ceiling on eating more, as a share of the target and as a hard cap.
+ *
+ * Eating less has a natural floor — the safe minimum — but eating more has
+ * none, so it gets an explicit one. A catch-up for a gain goal should read as
+ * an extra snack, never as a challenge: nobody is helped by being told to put
+ * away another 1,500 calories today because they under-ate last week.
+ */
+export const MAX_INCREASE_SHARE = 0.2;
+export const MAX_DAILY_INCREASE = 400;
+
+/** The most we will ever add to one day's target. */
+export function maxIncrease(dailyTarget: number): number {
+  return Math.max(
+    0,
+    Math.min(MAX_DAILY_INCREASE, Math.round(dailyTarget * MAX_INCREASE_SHARE)),
+  );
+}
+
+/** Which direction a goal's shortfall is closed in. */
+export function fixFor(goal: Goal): CatchUpFix {
+  return GOAL_WORDS[goal].fix;
+}
 
 export interface CatchUpInput {
   /**
@@ -26,6 +66,8 @@ export interface CatchUpInput {
   surplusCalories: number;
   dailyTarget: number;
   safeMinimum: number;
+  /** Defaults to eating less, which is what a deficit goal always wants. */
+  fix?: CatchUpFix;
   minDays?: number;
   maxDays?: number;
 }
@@ -35,9 +77,17 @@ export interface CatchUpPlan {
   surplusCalories: number;
   /** Days the adjustment is spread across. */
   days: number;
-  /** Calories to come off each day's target. */
+  /** Which way the plan moves the target. */
+  fix: CatchUpFix;
+  /**
+   * Calories to move each day's target by, always a positive magnitude. Which
+   * way it moves is `fix`.
+   */
   dailyAdjustment: number;
-  /** The temporary daily target, never below the safe minimum. */
+  /**
+   * The temporary daily target: never below the safe minimum when eating
+   * less, never more than `maxIncrease` above the target when eating more.
+   */
   adjustedTarget: number;
   coveredCalories: number;
   /** Excess the plan deliberately does not chase. */
@@ -55,7 +105,7 @@ export function surplusFrom(days: DayLog[], dailyTarget: number): number {
 
 export function planCatchUp(input: CatchUpInput): CatchUpPlan {
   const {
-    surplusCalories, dailyTarget, safeMinimum,
+    surplusCalories, dailyTarget, safeMinimum, fix = 'eat-less',
     minDays = MIN_SPREAD_DAYS, maxDays = MAX_SPREAD_DAYS,
   } = input;
 
@@ -63,6 +113,7 @@ export function planCatchUp(input: CatchUpInput): CatchUpPlan {
     needed: false,
     surplusCalories: Math.max(0, surplusCalories),
     days: 0,
+    fix,
     dailyAdjustment: 0,
     adjustedTarget: dailyTarget,
     coveredCalories: 0,
@@ -72,9 +123,11 @@ export function planCatchUp(input: CatchUpInput): CatchUpPlan {
 
   if (!(surplusCalories > 0)) return none;
 
-  // The most we will ever take off a day, so the plan can never push the user
-  // below a safe intake.
-  const maxDailyAdjustment = Math.max(0, dailyTarget - safeMinimum);
+  // The most we will ever move a day by, so the plan can never push someone
+  // below a safe intake, nor hand someone gaining an unreasonable number.
+  const maxDailyAdjustment = fix === 'eat-more'
+    ? maxIncrease(dailyTarget)
+    : Math.max(0, dailyTarget - safeMinimum);
   if (maxDailyAdjustment === 0) {
     return {
       ...none,
@@ -98,24 +151,32 @@ export function planCatchUp(input: CatchUpInput): CatchUpPlan {
     needed: true,
     surplusCalories,
     days,
+    fix,
     dailyAdjustment,
-    adjustedTarget: dailyTarget - dailyAdjustment,
+    adjustedTarget: fix === 'eat-more'
+      ? dailyTarget + dailyAdjustment
+      : dailyTarget - dailyAdjustment,
     coveredCalories,
     shortfallCalories,
     fullyCovered: shortfallCalories === 0,
   };
 }
 
-/** Convenience wrapper that picks the safe floor from the user's sex. */
+/**
+ * Convenience wrapper that picks the safe floor from the user's sex and the
+ * direction from their goal.
+ */
 export function planCatchUpForUser(
   surplusCalories: number,
   dailyTarget: number,
   sex: Sex,
+  goal: Goal = 'lose',
 ): CatchUpPlan {
   return planCatchUp({
     surplusCalories,
     dailyTarget,
     safeMinimum: SAFE_MIN_CALORIES[sex],
+    fix: fixFor(goal),
   });
 }
 
@@ -139,11 +200,13 @@ export function planRecovery(
   gapTotal: number,
   dailyTarget: number,
   sex: Sex,
+  goal: Goal = 'lose',
 ): CatchUpPlan {
   return planCatchUp({
     surplusCalories: Math.min(gapTotal, gapPerDay * RECOVERY_DAYS),
     dailyTarget,
     safeMinimum: SAFE_MIN_CALORIES[sex],
+    fix: fixFor(goal),
     minDays: RECOVERY_DAYS,
     maxDays: MAX_RECOVERY_DAYS,
   });

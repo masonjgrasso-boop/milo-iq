@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { maintenanceBasis, paceFromTotals, paceSummary, MIN_WORTH_CHASING } from './pace';
+import {
+  maintenanceBasis, paceFromTotals, paceSummary, MAINTAIN_BAND, MIN_WORTH_CHASING,
+} from './pace';
 import { planCatchUpForUser } from './catchup';
 import { SAFE_MIN_CALORIES } from './targets';
 import type { MaintenanceResult } from './maintenance';
@@ -185,11 +187,52 @@ describe('paceSummary', () => {
     expect(summary.targetPerDay).toBe(0);
     expect(summary.actualPerDay).toBe(0);
     expect(summary.gapPerDay).toBe(0);
-    expect(summary.status).toBe('above-maintenance'); // at maintenance exactly
+    expect(summary.status).toBe('on-track');
   });
 
-  it('reads a gain goal as a surplus, and does not call it over-eating', () => {
-    // Target above maintenance, so the intended "deficit" is negative.
+  it('counts a maintain goal as on track anywhere inside the band', () => {
+    const summary = paceSummary({
+      days: days([2560, 2570, 2550]),
+      ...window,
+      maintenanceCalories: 2500,
+      targetCalories: 2500,
+      goal: 'maintain',
+    });
+
+    expect(Math.abs(summary.actualPerDay)).toBeLessThanOrEqual(MAINTAIN_BAND);
+    expect(summary.status).toBe('on-track');
+  });
+
+  it('says which way a maintain goal has drifted once it leaves the band', () => {
+    const over = paceSummary({
+      days: days([2900, 2900, 2900]),
+      ...window,
+      maintenanceCalories: 2500,
+      targetCalories: 2500,
+      goal: 'maintain',
+    });
+    expect(over.status).toBe('above-maintenance');
+    // Above maintenance is the direction that is put right by eating less.
+    expect(over.gapPerDay).toBeGreaterThan(0);
+
+    const under = paceSummary({
+      days: days([2100, 2100, 2100]),
+      ...window,
+      maintenanceCalories: 2500,
+      targetCalories: 2500,
+      goal: 'maintain',
+    });
+    expect(under.status).toBe('under-maintenance');
+    // Drifting down is not a shortfall to chase by eating even less.
+    expect(under.gapPerDay).toBeLessThan(0);
+    expect(under.worthChasing).toBe(false);
+  });
+
+  // This case was asserted the wrong way round before: a 400 surplus against
+  // a 500 surplus plan is 100 short, not 100 ahead. The sign of the gap is
+  // what the catch-up plan reads, so getting it backwards meant someone
+  // gaining was told to carry on whenever they under-ate.
+  it('reads a gain goal as a surplus, and counts falling short of it', () => {
     const summary = paceSummary({
       days: days([2900, 2900, 2900]),
       ...window,
@@ -199,9 +242,39 @@ describe('paceSummary', () => {
     });
 
     expect(summary.targetPerDay).toBe(-500); // a 500 surplus was the plan
-    expect(summary.actualPerDay).toBe(-400); // 400 over maintenance so far
-    expect(summary.gapPerDay).toBe(-100); // ahead of the surplus plan
+    expect(summary.actualPerDay).toBe(-400); // 400 above maintenance so far
+    expect(summary.gapPerDay).toBe(100); // 100 short of the surplus
+    expect(summary.status).toBe('behind');
+    expect(summary.worthChasing).toBe(true);
     expect(summary.status).not.toBe('above-maintenance');
+  });
+
+  it('is ahead when the surplus beats a gain plan', () => {
+    const summary = paceSummary({
+      days: days([3200, 3200, 3200]),
+      ...window,
+      maintenanceCalories: 2500,
+      targetCalories: 3000,
+      goal: 'gain',
+    });
+
+    expect(summary.gapPerDay).toBeLessThan(0);
+    expect(summary.status).toBe('ahead');
+    expect(summary.worthChasing).toBe(false);
+  });
+
+  it('flags eating below maintenance on a gain goal as its own problem', () => {
+    const summary = paceSummary({
+      days: days([2200, 2300, 2100]),
+      ...window,
+      maintenanceCalories: 2500,
+      targetCalories: 3000,
+      goal: 'gain',
+    });
+
+    expect(summary.actualPerDay).toBeGreaterThan(0); // below maintenance
+    expect(summary.status).toBe('under-maintenance');
+    expect(summary.worthChasing).toBe(true);
   });
 
   it('ignores days outside the period', () => {

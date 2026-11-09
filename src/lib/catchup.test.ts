@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  planCatchUp, planCatchUpForUser, planRecovery, surplusFrom,
-  MIN_SPREAD_DAYS, MAX_SPREAD_DAYS, RECOVERY_DAYS, MAX_RECOVERY_DAYS,
+  fixFor, maxIncrease, planCatchUp, planCatchUpForUser, planRecovery, surplusFrom,
+  MAX_DAILY_INCREASE, MIN_SPREAD_DAYS, MAX_SPREAD_DAYS, RECOVERY_DAYS, MAX_RECOVERY_DAYS,
 } from './catchup';
 import { SAFE_MIN_CALORIES } from './targets';
 import type { DayLog } from './types';
@@ -156,5 +156,94 @@ describe('planRecovery', () => {
   it('respects the lower floor for women', () => {
     const plan = planRecovery(1000, 30_000, 1300, 'female');
     expect(plan.adjustedTarget).toBeGreaterThanOrEqual(SAFE_MIN_CALORIES.female);
+  });
+});
+
+describe('catching up on a gain goal', () => {
+  const target = 3000;
+
+  it('moves the target up rather than down', () => {
+    const plan = planCatchUp({
+      surplusCalories: 900,
+      dailyTarget: target,
+      safeMinimum: SAFE_MIN_CALORIES.male,
+      fix: 'eat-more',
+    });
+
+    expect(plan.fix).toBe('eat-more');
+    expect(plan.dailyAdjustment).toBe(300);
+    expect(plan.adjustedTarget).toBe(3300);
+  });
+
+  it('never suggests an extreme amount, however far behind', () => {
+    // 20,000 behind across three days would be 6,600 a day without the cap.
+    const plan = planCatchUp({
+      surplusCalories: 20_000,
+      dailyTarget: target,
+      safeMinimum: SAFE_MIN_CALORIES.male,
+      fix: 'eat-more',
+    });
+
+    expect(plan.dailyAdjustment).toBeLessThanOrEqual(MAX_DAILY_INCREASE);
+    expect(plan.adjustedTarget).toBeLessThanOrEqual(target + MAX_DAILY_INCREASE);
+    // And it says plainly that it is not chasing the rest.
+    expect(plan.fullyCovered).toBe(false);
+    expect(plan.shortfallCalories).toBeGreaterThan(0);
+  });
+
+  it('scales the cap down for a smaller target', () => {
+    // A fifth of 1,500 is 300, which is less than the hard cap.
+    expect(maxIncrease(1500)).toBe(300);
+    expect(maxIncrease(3000)).toBe(MAX_DAILY_INCREASE);
+    expect(maxIncrease(0)).toBe(0);
+  });
+
+  it('widens the spread before deepening the increase', () => {
+    const plan = planCatchUp({
+      surplusCalories: 2400,
+      dailyTarget: target,
+      safeMinimum: SAFE_MIN_CALORIES.male,
+      fix: 'eat-more',
+    });
+
+    expect(plan.days).toBeGreaterThan(MIN_SPREAD_DAYS);
+    expect(plan.days).toBeLessThanOrEqual(MAX_SPREAD_DAYS);
+    expect(plan.dailyAdjustment).toBeLessThanOrEqual(MAX_DAILY_INCREASE);
+  });
+
+  it('offers nothing when a gain goal is already ahead', () => {
+    expect(planCatchUpForUser(-500, target, 'male', 'gain').needed).toBe(false);
+  });
+
+  it('picks the direction from the goal', () => {
+    expect(fixFor('gain')).toBe('eat-more');
+    expect(fixFor('lose')).toBe('eat-less');
+    expect(fixFor('maintain')).toBe('eat-less');
+
+    expect(planCatchUpForUser(900, target, 'male', 'gain').adjustedTarget)
+      .toBeGreaterThan(target);
+    expect(planCatchUpForUser(900, target, 'male', 'lose').adjustedTarget)
+      .toBeLessThan(target);
+  });
+
+  it('keeps the safe floor out of it, since eating more cannot breach it', () => {
+    // A tiny target that eating less could not safely move at all.
+    const plan = planCatchUp({
+      surplusCalories: 600,
+      dailyTarget: SAFE_MIN_CALORIES.female,
+      safeMinimum: SAFE_MIN_CALORIES.female,
+      fix: 'eat-more',
+    });
+
+    expect(plan.needed).toBe(true);
+    expect(plan.dailyAdjustment).toBeGreaterThan(0);
+    expect(plan.adjustedTarget).toBeGreaterThan(SAFE_MIN_CALORIES.female);
+  });
+
+  it('still recovers over a month when that is the horizon', () => {
+    const plan = planRecovery(200, 6000, target, 'male', 'gain');
+    expect(plan.fix).toBe('eat-more');
+    expect(plan.days).toBeGreaterThanOrEqual(RECOVERY_DAYS);
+    expect(plan.adjustedTarget).toBeGreaterThan(target);
   });
 });

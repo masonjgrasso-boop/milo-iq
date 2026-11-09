@@ -94,6 +94,44 @@ export function calculateCalorieTarget(input: TargetInput): TargetResult {
   };
 }
 
+/** The goal and rate a target is worked out from, without the body figures. */
+export interface GoalInput {
+  goal: Goal;
+  sex: Sex;
+  /** Positive magnitude; ignored when the goal is "maintain". */
+  targetRateKgPerWeek: number;
+}
+
+/**
+ * The daily target that fits a goal around a maintenance figure we already
+ * have, in the same shape `calculateCalorieTarget` returns.
+ *
+ * This is the one to use whenever maintenance has been measured from the
+ * user's own logs. Re-running Mifflin-St Jeor instead would throw that
+ * measurement away and replace it with a guess that can be several hundred
+ * calories out — which is the whole thing this app exists to stop doing.
+ *
+ * `tdee` carries the maintenance figure that went in, so a caller can show
+ * the same two numbers whichever function produced them.
+ */
+export function targetFromMaintenance(
+  maintenanceCalories: number,
+  input: GoalInput,
+): TargetResult {
+  const delta = input.goal === 'maintain' ? 0 : dailyCalorieDelta(input.targetRateKgPerWeek);
+  const direction = input.goal === 'gain' ? 1 : input.goal === 'lose' ? -1 : 0;
+  const raw = maintenanceCalories + direction * delta;
+
+  const floor = SAFE_MIN_CALORIES[input.sex];
+  const clampedToFloor = raw < floor;
+
+  return {
+    tdee: Math.round(maintenanceCalories),
+    calorieTarget: Math.round(clampedToFloor ? floor : raw),
+    clampedToFloor,
+  };
+}
+
 /**
  * The daily target that fits the user's goal around a known maintenance
  * figure. Keeps whatever goal and rate they chose, just anchored to a measured
@@ -101,12 +139,7 @@ export function calculateCalorieTarget(input: TargetInput): TargetResult {
  */
 export function suggestedTarget(
   maintenanceCalories: number,
-  profile: { goal: Goal; sex: Sex; targetRateKgPerWeek: number },
+  profile: GoalInput,
 ): number {
-  const delta = profile.goal === 'maintain' ? 0 : dailyCalorieDelta(profile.targetRateKgPerWeek);
-  const direction = profile.goal === 'gain' ? 1 : -1;
-  return Math.max(
-    SAFE_MIN_CALORIES[profile.sex],
-    Math.round(maintenanceCalories + direction * delta),
-  );
+  return targetFromMaintenance(maintenanceCalories, profile).calorieTarget;
 }

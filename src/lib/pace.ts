@@ -12,9 +12,11 @@
 //   target  = maintenance - calorie target   (how far below you meant to be)
 //   gap     = target - actual                (what it takes to get back on pace)
 //
-// A positive gap means behind the plan. The gap is only ever closed by eating
-// less: this never tells someone to eat more, which would be a strange thing
-// to read the morning after going over.
+// A positive gap always means behind the plan, whichever goal is in force.
+// For someone losing weight the plan is a deficit and the gap closes by eating
+// less; for someone gaining it is a surplus and the gap closes by eating more.
+// The direction flip lives in one line below, because getting it wrong means
+// telling someone who is 100 short of their surplus that they are ahead.
 
 import type { DayKey } from './dates';
 import { estimateTdee } from './targets';
@@ -26,6 +28,16 @@ import type { DayLog, Goal, UserProfile } from './types';
  * the app would offer a three-day plan to recover forty calories.
  */
 export const MIN_WORTH_CHASING = 100;
+
+/**
+ * Maintaining counts as on track while the average stays within this many
+ * calories a day of maintenance, either side.
+ *
+ * Nobody eats their maintenance figure exactly, and demanding it would make a
+ * maintain goal permanently unachievable. A hundred calories a day is about a
+ * tenth of a pound a month — close enough to be holding steady.
+ */
+export const MAINTAIN_BAND = 100;
 
 export type MaintenanceSource = 'measured' | 'estimated';
 
@@ -84,13 +96,24 @@ export interface PaceInput {
 /**
  * Where the user stands against their plan for a period.
  *
- * - `ahead`: more of a deficit than the goal asked for
- * - `on-track`: within `MIN_WORTH_CHASING` of the intended deficit
- * - `behind`: short of the intended deficit, but still below maintenance
- * - `above-maintenance`: eating at or above maintenance over the period
+ * - `ahead`: more of a gap than the goal asked for, in the goal's direction
+ * - `on-track`: within `MIN_WORTH_CHASING` of the intended gap, or inside
+ *   `MAINTAIN_BAND` of maintenance when maintaining
+ * - `behind`: short of the intended gap, but still on the right side of
+ *   maintenance
+ * - `above-maintenance`: eating at or above maintenance when the goal wanted
+ *   to be below it
+ * - `under-maintenance`: eating at or below maintenance when the goal wanted
+ *   to be above it, which is the mirror image for someone gaining
  * - `no-data`: nothing logged, so there is nothing to say
  */
-export type PaceStatus = 'ahead' | 'on-track' | 'behind' | 'above-maintenance' | 'no-data';
+export type PaceStatus =
+  | 'ahead'
+  | 'on-track'
+  | 'behind'
+  | 'above-maintenance'
+  | 'under-maintenance'
+  | 'no-data';
 
 export interface PaceSummary {
   daysLogged: number;
@@ -104,7 +127,11 @@ export interface PaceSummary {
   /** Maintenance minus target. Positive means the plan wants a deficit. */
   targetPerDay: number;
   targetTotal: number;
-  /** Target minus actual. Positive means behind the plan. */
+  /**
+   * How far short of the plan the average is, in the goal's own direction.
+   * Positive means behind, whether that is too little deficit or too little
+   * surplus. Negative means ahead.
+   */
   gapPerDay: number;
   gapTotal: number;
   status: PaceStatus;
@@ -134,7 +161,15 @@ export function paceFromTotals(input: PaceTotals): PaceSummary {
 
   const targetPerDay = Math.round(maintenanceCalories - targetCalories);
   const actualPerDay = daysLogged === 0 ? 0 : Math.round(maintenanceCalories - avgIntake);
-  const gapPerDay = daysLogged === 0 ? 0 : targetPerDay - actualPerDay;
+
+  // Both figures above are deficit-signed: positive is below maintenance. For
+  // someone gaining, the plan and the progress are both negative, so the raw
+  // difference comes out backwards — eating 400 above maintenance against a
+  // 500 surplus plan would read as 100 ahead when it is 100 short. Flipping
+  // the sign for a gain goal is what makes "positive means behind" true for
+  // everyone.
+  const direction = goal === 'gain' ? -1 : 1;
+  const gapPerDay = daysLogged === 0 ? 0 : direction * (targetPerDay - actualPerDay);
 
   const base: Omit<PaceSummary, 'status' | 'worthChasing'> = {
     daysLogged,
@@ -155,9 +190,19 @@ export function paceFromTotals(input: PaceTotals): PaceSummary {
   }
 
   const status: PaceStatus = (() => {
-    // Gaining is the mirror image: "below maintenance" is the problem there,
-    // not the goal, and the sign of the gap already accounts for it.
-    if (goal !== 'gain' && actualPerDay <= 0) return 'above-maintenance';
+    // Maintaining is not a gap to close but a line to sit near, so it is
+    // judged on distance from maintenance in either direction.
+    if (goal === 'maintain') {
+      if (Math.abs(actualPerDay) <= MAINTAIN_BAND) return 'on-track';
+      return actualPerDay < 0 ? 'above-maintenance' : 'under-maintenance';
+    }
+
+    // On the wrong side of maintenance altogether, which is its own thing to
+    // say: not a shortfall against the plan but no progress at all. Gaining is
+    // the mirror image, and eating at maintenance counts for both.
+    if (goal === 'lose' && actualPerDay <= 0) return 'above-maintenance';
+    if (goal === 'gain' && actualPerDay >= 0) return 'under-maintenance';
+
     if (gapPerDay <= 0) return 'ahead';
     if (gapPerDay * daysLogged < MIN_WORTH_CHASING) return 'on-track';
     return 'behind';
@@ -166,8 +211,10 @@ export function paceFromTotals(input: PaceTotals): PaceSummary {
   return {
     ...base,
     status,
-    // Only a real shortfall earns a plan, and only ever in the eat-less
-    // direction — being ahead is good news, not something to correct.
+    // Only a real shortfall earns a plan: being ahead is good news, not
+    // something to correct, so a negative gap never becomes one. Because the
+    // gap is goal-directed, "short" means too little deficit for someone
+    // losing and too little surplus for someone gaining.
     worthChasing: base.gapTotal >= MIN_WORTH_CHASING,
   };
 }
