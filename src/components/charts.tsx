@@ -8,6 +8,11 @@
 // colour-vision deficiency against each other and the card surface (OKLab
 // ΔE 30.9 under protanopia), and bars also sit on opposite sides of the zero
 // line, so the distinction never rests on colour alone.
+//
+// The deficit chart is oriented by the goal before it gets here: up is always
+// the direction the user meant to go. So the colours stay put — green above
+// the line, amber below — and it is the legend that changes wording, which is
+// what keeps "a bar above the line is a good day" true for every goal.
 
 import type { ReactNode } from 'react';
 import {
@@ -15,7 +20,16 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import type { DeficitPoint } from '../lib/deficit';
+import { GOAL_WORDS } from '../lib/goals';
+import type { Goal } from '../lib/types';
 import { barPath, barRadii } from '../lib/bars';
+
+/**
+ * Calories on the side axis, signed, so the reader can tell which side of
+ * maintenance a bar is on without counting gridlines.
+ */
+const signedCalories = (value: number): string =>
+  (value > 0 ? '+' : '') + value.toLocaleString();
 
 export const CHART_COLORS = {
   /** Under maintenance: the brand green. */
@@ -97,51 +111,71 @@ function DeficitBar(props: {
  * back about fifty pixels of plot on a phone.
  */
 export function DeficitChart({
-  data, goalDeficit, ticks, dense = false, goalChangeAt = [],
+  data, goalDeficit, ticks, goal, averageLabel, dense = false, goalChangeAt = [],
 }: {
   data: DeficitPoint[];
+  /** The gap the goal asks for, already oriented the same way as the bars. */
   goalDeficit: number;
   /** One entry per bar; an empty string leaves that bar unlabelled. */
   ticks: string[];
-  /** Month and year views pack the bars tighter. */
+  /** Names the two sides of the zero line. */
+  goal: Goal;
+  /** What the trailing average covers, which depends on the bar width. */
+  averageLabel: string;
+  /** The year view packs its fifty-odd bars tighter. */
   dense?: boolean;
   /** Bars where a new goal started, as indices into `data`. */
   goalChangeAt?: number[];
 }) {
+  const words = GOAL_WORDS[goal];
+  // Maintaining asks for no gap, so its goal line would sit exactly on the
+  // zero line already drawn. Two lines in one place reads as a rendering bug.
+  const showGoalLine = goalDeficit !== 0;
+
   return (
     <>
       <div className="h-[190px] lg:h-[260px]">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={data}
-          margin={{ top: 14, right: 2, bottom: 0, left: 2 }}
+          margin={{ top: 14, right: 0, bottom: 0, left: 2 }}
           barCategoryGap={dense ? '10%' : '22%'}
         >
           <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} />
           <XAxis dataKey="label" {...axisProps} {...tickProps(ticks)} />
-          <YAxis hide />
+          {/* On the right, matching the weight chart below it, and sparse
+              enough that three numbers never crowd a phone. */}
+          <YAxis
+            {...axisProps}
+            orientation="right"
+            width={46}
+            tickCount={3}
+            tickFormatter={signedCalories}
+          />
           <Tooltip
             {...tooltipProps}
             formatter={(value, name) => [
               `${Math.abs(Number(value)).toLocaleString()} cal`,
-              name === 'runningAvg'
-                ? 'Average so far'
+              name === 'rollingAvg'
+                ? averageLabel
                 : Number(value) >= 0
-                  ? 'Under maintenance'
-                  : 'Over',
+                  ? words.above
+                  : words.below,
             ]}
           />
           {/* Maintenance itself. Crossing it is the only thing that matters. */}
           <ReferenceLine y={0} stroke={CHART_COLORS.zero} />
           {/* No label on the line itself: a tall bar reaching the top of the
               plot would sit underneath it. The number is in the key instead. */}
-          <ReferenceLine
-            y={goalDeficit}
-            stroke={CHART_COLORS.reference}
-            strokeDasharray="4 4"
-            strokeWidth={2}
-            ifOverflow="extendDomain"
-          />
+          {showGoalLine && (
+            <ReferenceLine
+              y={goalDeficit}
+              stroke={CHART_COLORS.reference}
+              strokeDasharray="4 4"
+              strokeWidth={2}
+              ifOverflow="extendDomain"
+            />
+          )}
           {/* Where the goal changed. An annotation rather than a series: the
               bars either side are measured against different targets, and
               without this the step in the dashed goal line looks like a bug.
@@ -158,7 +192,7 @@ export function DeficitChart({
           <Bar dataKey="deficit" shape={<DeficitBar />} isAnimationActive={false} />
           <Line
             type="monotone"
-            dataKey="runningAvg"
+            dataKey="rollingAvg"
             stroke={CHART_COLORS.average}
             strokeWidth={2.5}
             strokeLinecap="round"
@@ -174,12 +208,14 @@ export function DeficitChart({
           Recharts legend, so the key is written by hand. It also discharges
           the contrast obligation on the amber, which is below 3:1 on white. */}
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-ink-soft">
-        <Key color={CHART_COLORS.under}>Under maintenance</Key>
-        <Key color={CHART_COLORS.over}>Over</Key>
-        <Key color={CHART_COLORS.average} line>Average so far</Key>
-        <Key color={CHART_COLORS.reference} line dashed>
-          Goal ({goalDeficit.toLocaleString()} cal)
-        </Key>
+        <Key color={CHART_COLORS.under}>{words.above}</Key>
+        <Key color={CHART_COLORS.over}>{words.below}</Key>
+        <Key color={CHART_COLORS.average} line>{averageLabel}</Key>
+        {showGoalLine && (
+          <Key color={CHART_COLORS.reference} line dashed>
+            Goal ({signedCalories(goalDeficit)} cal)
+          </Key>
+        )}
         {goalChangeAt.length > 0 && (
           <Key color={CHART_COLORS.reference} vertical>Goal changed</Key>
         )}

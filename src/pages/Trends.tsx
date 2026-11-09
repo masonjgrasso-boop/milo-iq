@@ -11,16 +11,18 @@ import { useDayRange } from '../hooks/useDayRange';
 import { useMaintenanceBasis } from '../hooks/useMaintenanceBasis';
 import { useWeekSummaries } from '../hooks/useWeekSummaries';
 import {
-  addDays, shortDateLabel, todayKey, toWeekKey, weekKeyToMonday, weekdayLabel,
+  addDays, shortDateLabel, todayKey, toWeekKey, weekKeyToMonday,
 } from '../lib/dates';
 import {
-  blendedTarget, describeAverage, goalChangeIndices, GOAL_WORDS,
+  blendedTarget, describeAverage, goalChangeIndices, progressToward, GOAL_WORDS,
 } from '../lib/goals';
 import { MAX_WINDOW_DAYS, type MaintenanceResult } from '../lib/maintenance';
 import { paceFromTotals, type MaintenanceBasis, type PaceSummary } from '../lib/pace';
 import {
-  axisTicks, dailyDeficitPoints, sumDays, sumWeeks, weekKeysFor, weeklyDeficitPoints,
-  RANGE_DAYS, RANGE_LABELS, type DeficitPoint, type TrendRange,
+  axisTicks, dailyDeficitPoints, firstActiveIndex, orientPoints, sumDays, sumWeeks,
+  weekKeysFor, weeklyDeficitPoints,
+  BUCKET_FOR, RANGE_DAYS, RANGE_LABELS, ROLLING_LABELS,
+  type BucketSize, type DeficitPoint, type TrendRange,
 } from '../lib/deficit';
 import { trendChangeKg, trendSeries } from '../lib/trend';
 import { formatWeight, fromKg, weightUnitLabel } from '../lib/units';
@@ -33,7 +35,9 @@ import { Page } from '../components/Layout';
 
 export function Trends() {
   const { profile } = useAuth();
-  const [range, setRange] = useState<TrendRange>('week');
+  // A month is the shortest span that says anything about a trend, so it is
+  // where the screen opens.
+  const [range, setRange] = useState<TrendRange>('month');
 
   if (!profile) return null;
 
@@ -44,29 +48,30 @@ export function Trends() {
         onChange={setRange}
         size="lg"
         options={[
-          { value: 'week', label: 'Week' },
           { value: 'month', label: 'Month' },
+          { value: 'quarter', label: '3 Months' },
           { value: 'year', label: 'Year' },
         ]}
       />
 
       {/* Each view owns its own read, so switching to Year never costs the
-          week view a query it does not need. */}
-      {range === 'year' ? (
-        <YearView profile={profile} />
+          month view a query it does not need. */}
+      {BUCKET_FOR[range] === 'day' ? (
+        <DayView profile={profile} />
       ) : (
-        <DayView range={range} profile={profile} />
+        <WeekView range={range} profile={profile} />
       )}
     </Page>
   );
 }
 
-/** Week and month: one bar per day, straight from the day logs. */
-function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }) {
+/** Month: one bar per day, straight from the day logs. */
+function DayView({ profile }: { profile: UserProfile }) {
   const today = todayKey();
+  const range: TrendRange = 'month';
 
-  // One read serves both the chart and the maintenance window, so the week
-  // view reaches back further than it draws.
+  // One read serves both the chart and the maintenance window, whichever of
+  // the two reaches back further.
   const span = Math.max(RANGE_DAYS[range], MAX_WINDOW_DAYS);
   const from = useMemo(() => addDays(today, -(span - 1)), [today, span]);
   const { days, loading } = useDayRange(from, today);
@@ -74,15 +79,22 @@ function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }
   const { result, basis } = useMaintenanceBasis(days, profile);
 
   const start = addDays(today, -(RANGE_DAYS[range] - 1));
-  const inRange = (days ?? []).filter((day) => day.date >= start);
+  const windowed = (days ?? []).filter((day) => day.date >= start);
 
-  const points = dailyDeficitPoints(
-    inRange,
-    basis.calories,
-    range === 'week' ? weekdayLabel : shortDateLabel,
+  // Start the chart at the first day with anything on it. Someone four days
+  // in should see four bars, not four bars and twenty-six days of blank.
+  // Weigh-ins count as well as food, so both charts begin together.
+  const begin = firstActiveIndex(
+    windowed.map((day) => day.calories > 0 || day.weightKg !== undefined),
+  );
+  const inRange = windowed.slice(begin);
+
+  const points = orientPoints(
+    dailyDeficitPoints(inRange, basis.calories, shortDateLabel),
+    profile.goal,
   );
   const dates = inRange.map((day) => day.date);
-  const ticks = axisTicks(dates, range);
+  const ticks = axisTicks(dates, 'day');
 
   // Only the days that were logged are scored, so only they decide the target
   // this period is measured against. A period straddling a goal change gets
@@ -97,7 +109,7 @@ function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }
 
   const trend = trendSeries(inRange);
   const weightPoints: WeightPoint[] = trend.map((point) => ({
-    label: range === 'week' ? weekdayLabel(point.date) : shortDateLabel(point.date),
+    label: shortDateLabel(point.date),
     weight: toDisplay(point.weightKg, profile),
     trend: toDisplay(point.trendKg, profile),
   }));
@@ -106,6 +118,7 @@ function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }
     <Body
       loading={loading}
       range={range}
+      bucket="day"
       profile={profile}
       result={result}
       basis={basis}
@@ -120,14 +133,18 @@ function DayView({ range, profile }: { range: TrendRange; profile: UserProfile }
 }
 
 /**
- * Year: one bar per ISO week, read from the precomputed weekly roll-ups rather
- * than 365 raw day logs — about 53 small documents for the same answer.
+ * Three months and a year: one bar per ISO week, read from the precomputed
+ * weekly roll-ups rather than hundreds of raw day logs — about 13 or 53 small
+ * documents for the same answer.
+ *
+ * Ninety daily bars would be three pixels each on a phone, so anything past a
+ * month is bucketed by week rather than drawn a day at a time.
  */
-function YearView({ profile }: { profile: UserProfile }) {
+function WeekView({ range, profile }: { range: TrendRange; profile: UserProfile }) {
   const today = todayKey();
 
-  const keys = useMemo(() => weekKeysFor(today, RANGE_DAYS.year), [today]);
-  const { weeks, loading } = useWeekSummaries(keys[0], toWeekKey(today));
+  const allKeys = useMemo(() => weekKeysFor(today, RANGE_DAYS[range]), [today, range]);
+  const { weeks, loading } = useWeekSummaries(allKeys[0], toWeekKey(today));
 
   // The maintenance estimate still needs day-level logs, and only ever looks
   // back four weeks.
@@ -136,12 +153,24 @@ function YearView({ profile }: { profile: UserProfile }) {
   const { result, basis } = useMaintenanceBasis(days, profile);
 
   const found = weeks ?? [];
-  const points = weeklyDeficitPoints(keys, found, basis.calories);
-  const mondays = keys.map(weekKeyToMonday);
-  const ticks = axisTicks(mondays, 'year');
-
-  // A week's average weight is the right dot at this zoom.
   const byKey = new Map(found.map((week) => [week.key, week]));
+
+  // As in the day view: begin at the first week with anything in it. Trimmed
+  // weeks are empty by definition, so none of the totals below change.
+  const begin = firstActiveIndex(
+    allKeys.map((key) => {
+      const week = byKey.get(key);
+      return (week?.daysLogged ?? 0) > 0 || week?.avgWeightKg != null;
+    }),
+  );
+  const keys = allKeys.slice(begin);
+
+  const points = orientPoints(
+    weeklyDeficitPoints(keys, found, basis.calories),
+    profile.goal,
+  );
+  const mondays = keys.map(weekKeyToMonday);
+  const ticks = axisTicks(mondays, 'week');
 
   // Blended by week rather than by day here, since that is the resolution
   // this view reads at. A week containing a goal change is attributed to
@@ -168,7 +197,8 @@ function YearView({ profile }: { profile: UserProfile }) {
   return (
     <Body
       loading={loading}
-      range="year"
+      range={range}
+      bucket="week"
       profile={profile}
       result={result}
       basis={basis}
@@ -178,7 +208,8 @@ function YearView({ profile }: { profile: UserProfile }) {
       weightPoints={weightPoints}
       weightChangeKg={trendChangeKg(trend)}
       goalChangeAt={goalChangeIndices(mondays, history)}
-      dense
+      // Fifty-odd bars need the tighter packing; thirteen do not.
+      dense={range === 'year'}
     />
   );
 }
@@ -207,11 +238,13 @@ function toDisplay(kg: number | null | undefined, profile: UserProfile): number 
 }
 
 function Body({
-  loading, range, profile, result, basis, points, ticks, pace, weightPoints, weightChangeKg,
-  goalChangeAt, dense = false,
+  loading, range, bucket, profile, result, basis, points, ticks, pace, weightPoints,
+  weightChangeKg, goalChangeAt, dense = false,
 }: {
   loading: boolean;
   range: TrendRange;
+  /** How wide one bar is, which is what the average line's window follows. */
+  bucket: BucketSize;
   profile: UserProfile;
   result: MaintenanceResult;
   basis: MaintenanceBasis;
@@ -269,8 +302,12 @@ function Body({
             />
             <DeficitChart
               data={points}
-              goalDeficit={pace.targetPerDay}
+              // Oriented the same way as the bars, so for a gain goal the
+              // line sits above zero with them rather than mirroring them.
+              goalDeficit={progressToward(profile.goal, pace.targetPerDay)}
               ticks={ticks}
+              goal={profile.goal}
+              averageLabel={ROLLING_LABELS[bucket]}
               goalChangeAt={goalChangeAt}
               dense={dense}
             />

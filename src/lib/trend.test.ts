@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  smoothSeries, trendSeries, latestTrend, firstTrend, weighInSpan, countWeighIns,
-  trendChangeKg,
+  alphaFor, smoothSeries, trendSeries, latestTrend, firstTrend, weighInSpan,
+  countWeighIns, trendChangeKg,
   DEFAULT_ALPHA,
 } from './trend';
 
@@ -80,7 +80,9 @@ describe('trendSeries', () => {
       { date: '2026-03-05', weightKg: 78 },
     ]);
     expect(points[2].trendKg).toBe(80);
-    expect(points[3].trendKg).toBeCloseTo(DEFAULT_ALPHA * 78 + (1 - DEFAULT_ALPHA) * 80, 10);
+    // The second weigh-in carries half the weight, so the trend sits midway
+    // rather than 0.2 kg from where it started.
+    expect(points[3].trendKg).toBeCloseTo(79, 10);
   });
 
   it('returns an empty series for no days', () => {
@@ -97,7 +99,7 @@ describe('trend readers', () => {
 
   it('finds the first and latest trend values', () => {
     expect(firstTrend(points)).toBe(80);
-    expect(latestTrend(points)).toBeCloseTo(DEFAULT_ALPHA * 78 + (1 - DEFAULT_ALPHA) * 80, 10);
+    expect(latestTrend(points)).toBeCloseTo(79, 10);
   });
 
   it('returns null when nothing has been weighed', () => {
@@ -143,5 +145,56 @@ describe('trendChangeKg', () => {
 
   it('says nothing when the scale was never used', () => {
     expect(trendChangeKg(trendSeries([{ date: '2026-03-02' }]))).toBeNull();
+  });
+});
+
+describe('responsiveness while there are few weigh-ins', () => {
+  it('weights the first readings more, then settles to the usual memory', () => {
+    expect(alphaFor(1)).toBe(1);
+    expect(alphaFor(2)).toBe(0.5);
+    expect(alphaFor(4)).toBe(0.25);
+    expect(alphaFor(10)).toBeCloseTo(DEFAULT_ALPHA, 10);
+    // And never drops below the floor, however long the history.
+    expect(alphaFor(500)).toBe(DEFAULT_ALPHA);
+  });
+
+  it('is the plain average of the readings so far while warming up', () => {
+    const points = trendSeries([
+      { date: '2026-03-02', weightKg: 81 },
+      { date: '2026-03-03', weightKg: 80 },
+      { date: '2026-03-04', weightKg: 79 },
+    ]);
+    expect(points[2].trendKg).toBeCloseTo(80, 10);
+  });
+
+  it('actually follows a real loss across three weigh-ins', () => {
+    const readings = [
+      { date: '2026-03-02', weightKg: 85 },
+      { date: '2026-03-05', weightKg: 84 },
+      { date: '2026-03-08', weightKg: 83 },
+    ];
+    const change = trendChangeKg(trendSeries(readings)) as number;
+    // A fixed 0.1 would report under 0.3 kg of a 2 kg drop. The point of the
+    // change is that the line says something by the third weigh-in.
+    expect(change).toBeLessThan(-0.9);
+    expect(change).toBeGreaterThan(-2);
+  });
+
+  it('still damps a single spike once there is a history', () => {
+    const flat = Array.from({ length: 20 }, (_, index) => ({
+      date: '2026-03-' + String(index + 1).padStart(2, '0'),
+      weightKg: 80,
+    }));
+    const spiked = [...flat, { date: '2026-03-21', weightKg: 85 }];
+    const trend = latestTrend(trendSeries(spiked)) as number;
+
+    // The twenty-first reading is well past the warm-up, so a 5 kg jump moves
+    // the line by half a kilo, not by five.
+    expect(trend - 80).toBeLessThan(1);
+    expect(trend).toBeGreaterThan(80);
+  });
+
+  it('leaves the very first reading as itself', () => {
+    expect(trendSeries([{ date: '2026-03-02', weightKg: 80 }])[0].trendKg).toBe(80);
   });
 });

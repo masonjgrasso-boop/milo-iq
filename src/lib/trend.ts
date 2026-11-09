@@ -8,10 +8,30 @@
 import type { DayKey } from './dates';
 
 /**
- * Smoothing factor. 0.1 gives roughly a ten-day memory: responsive enough to
- * show a real change within a week, damped enough to ignore a salty dinner.
+ * Smoothing factor once there is a history to smooth. 0.1 gives roughly a
+ * ten-day memory: responsive enough to show a real change within a week,
+ * damped enough to ignore a salty dinner.
  */
 export const DEFAULT_ALPHA = 0.1;
+
+/**
+ * How much weight a new reading carries, given how many came before it.
+ *
+ * A fixed 0.1 from the very first weigh-in anchors the trend to one noisy
+ * number. After three weigh-ins the line has barely left where it started,
+ * so someone who really is losing weight opens the app and sees a flat
+ * trend \— which is exactly the discouragement the trend line exists to
+ * prevent.
+ *
+ * Falling from 1 towards the floor as readings accumulate fixes that
+ * without inventing a second smoothing scheme: while 1/n is above the floor
+ * the trend is precisely the plain average of the readings so far, which is
+ * both responsive and unbiased, and from the tenth weigh-in onwards it is
+ * the ordinary ten-day memory again.
+ */
+export function alphaFor(weighIns: number, alpha = DEFAULT_ALPHA): number {
+  return Math.max(alpha, 1 / Math.max(1, weighIns));
+}
 
 export interface TrendPoint {
   date: DayKey;
@@ -44,11 +64,16 @@ export function trendSeries(
 ): TrendPoint[] {
   const ordered = [...days].sort((a, b) => a.date.localeCompare(b.date));
   let trend: number | null = null;
+  let weighIns = 0;
 
   return ordered.map((day) => {
     const weightKg = day.weightKg ?? null;
     if (weightKg !== null) {
-      trend = trend === null ? weightKg : alpha * weightKg + (1 - alpha) * trend;
+      weighIns += 1;
+      // Early readings count for more, so the line is useful from about the
+      // third weigh-in rather than from the fifteenth. See alphaFor.
+      const weight = alphaFor(weighIns, alpha);
+      trend = trend === null ? weightKg : weight * weightKg + (1 - weight) * trend;
     }
     return { date: day.date, weightKg, trendKg: trend };
   });

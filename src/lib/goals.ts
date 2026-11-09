@@ -150,6 +150,16 @@ export interface GoalVocabulary {
   chart: string;
   /** A single bar going the wrong way, for the note under that chart. */
   offDay: string;
+  /**
+   * What a bar above the zero line is called, and what one below it is.
+   *
+   * The chart is oriented so that up is always the way the goal wants to go,
+   * which means these two swap meaning between goals rather than the colours
+   * doing it: for someone losing, up is a deficit; for someone gaining, up is
+   * a surplus and down is having eaten under maintenance.
+   */
+  above: string;
+  below: string;
 }
 
 export const GOAL_WORDS: Record<Goal, GoalVocabulary> = {
@@ -161,6 +171,8 @@ export const GOAL_WORDS: Record<Goal, GoalVocabulary> = {
     verb: 'lose',
     chart: 'Daily deficit',
     offDay: 'An over day',
+    above: 'Deficit',
+    below: 'Over',
   },
   maintain: {
     gap: 'balance',
@@ -170,6 +182,8 @@ export const GOAL_WORDS: Record<Goal, GoalVocabulary> = {
     verb: 'maintain',
     chart: 'Against maintenance',
     offDay: 'An off day',
+    above: 'Under maintenance',
+    below: 'Over',
   },
   gain: {
     gap: 'surplus',
@@ -179,6 +193,8 @@ export const GOAL_WORDS: Record<Goal, GoalVocabulary> = {
     verb: 'gain',
     chart: 'Daily surplus',
     offDay: 'A light day',
+    above: 'Surplus',
+    below: 'Under maintenance',
   },
 };
 
@@ -203,7 +219,10 @@ export const GOAL_GAP_LABEL: Record<Goal, string> = {
  * behind when they are 400 ahead.
  */
 export function progressToward(goal: Goal, deficitPerDay: number): number {
-  return goal === 'gain' ? -deficitPerDay : deficitPerDay;
+  if (goal !== 'gain') return deficitPerDay;
+  // Negating an exact zero yields -0, which compares unequal to 0 under
+  // Object.is and can print with a stray minus on a chart axis.
+  return deficitPerDay === 0 ? 0 : -deficitPerDay;
 }
 
 /**
