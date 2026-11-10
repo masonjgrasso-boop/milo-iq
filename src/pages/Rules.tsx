@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
 import { useDay } from '../hooks/useDay';
+import { useGroupSync } from '../hooks/useGroupSync';
 import { useDayRange } from '../hooks/useDayRange';
 import { listRules } from '../data/rules';
 import { addDays, friendlyDayLabel, startOfWeek, todayKey } from '../lib/dates';
@@ -31,6 +32,7 @@ export function Rules() {
   );
   const { days } = useDayRange(window.from, window.to);
   const { day, setRuleValue } = useDay(today);
+  const groups = useGroupSync();
 
   useEffect(() => {
     if (!user) return;
@@ -85,7 +87,12 @@ export function Rules() {
             day={day}
             weekDays={weekDays}
             historyDays={history}
-            onChange={setRuleValue}
+            onChange={async (ruleId, value) => {
+          const saved = await setRuleValue(ruleId, value);
+          // Posts only when this tick completes the day's set, which the
+          // check inside postRulesKept decides from the day it is handed.
+          groups.rulesKept(rules ?? [], saved ?? undefined);
+        }}
           />
         </>
       )}

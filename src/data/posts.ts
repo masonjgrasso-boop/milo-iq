@@ -21,10 +21,10 @@ import {
   serverTimestamp, setDoc, startAfter, updateDoc, where, writeBatch,
   type DocumentData, type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { deleteObject, getDownloadURL, listAll, ref, uploadBytes, getMetadata } from 'firebase/storage';
 import { getDb, getFirebaseStorage } from '../lib/firebase';
 import {
-  withoutItems, PAGE_SIZE,
+  expiryFrom, feedCutoff, withoutItems, PAGE_SIZE,
   type FeedComment, type FeedPost, type ItemKind, type Nudge, type PostItem,
   type PostKind, type Reaction,
 } from '../lib/feed';
@@ -48,11 +48,16 @@ export interface FeedPage {
 }
 
 /**
- * One page of the feed, newest first.
+ * One page of the feed, newest first, reaching back thirty days.
  *
- * `author` narrows it to a single member, which is the filter the feed offers.
- * Both orderings are on createdAt, so the filtered query needs a composite
- * index; it is declared in firestore.indexes.json.
+ * The date filter is belt and braces against the TTL policy, which deletes
+ * expired posts within a day or so of their expiry rather than on the
+ * stroke of midnight. Without it a feed could briefly show a post that is
+ * meant to be gone.
+ *
+ * `author` narrows it to a single member, which is the filter the feed
+ * offers. Both shapes order on createdAt and both need a composite index;
+ * they are declared in firestore.indexes.json.
  */
 export async function listPosts(
   groupId: string,
@@ -61,6 +66,7 @@ export async function listPosts(
   const size = options.pageSize ?? PAGE_SIZE;
   const clauses = [
     ...(options.author ? [where('authorUid', '==', options.author)] : []),
+    where('createdAt', '>=', feedCutoff()),
     orderBy('createdAt', 'desc'),
     ...(options.after ? [startAfter(options.after)] : []),
     limit(size),
@@ -95,8 +101,7 @@ export interface NewPost {
 /** Posts something the member wrote. A fresh id, so it is never deduplicated. */
 export async function createPost(groupId: string, post: NewPost): Promise<FeedPost> {
   const ref = doc(postsCollection(groupId));
-  const body = { ...post, createdAt: serverTimestamp() };
-  await setDoc(ref, body);
+  await setDoc(ref, { ...post, createdAt: serverTimestamp(), expiresAt: expiryFrom() });
   return { ...post, id: ref.id };
 }
 
@@ -123,6 +128,9 @@ export async function writeDigestItem(
       kind: 'digest',
       items: { [item.kind]: item },
       createdAt: serverTimestamp(),
+      // Reset with every line, so a card that gained something today lasts
+      // thirty days from today rather than from whenever it started.
+      expiresAt: expiryFrom(),
     },
     { merge: true },
   );
@@ -228,7 +236,10 @@ export async function addComment(
   comment: { authorUid: string; authorName: string; text: string },
 ): Promise<FeedComment> {
   const ref = doc(commentsCollection(groupId, postId));
-  await setDoc(ref, { ...comment, createdAt: serverTimestamp() });
+  // A comment carries its own expiry because deleting a post does not cascade
+  // to its subcollection, in Firestore or in a TTL policy. Both need a policy
+  // of their own, and both have one.
+  await setDoc(ref, { ...comment, createdAt: serverTimestamp(), expiresAt: expiryFrom() });
   return { ...comment, id: ref.id };
 }
 
@@ -275,6 +286,7 @@ export async function sendNudge(
     ...nudge,
     seen: false,
     createdAt: serverTimestamp(),
+    expiresAt: expiryFrom(),
   });
 }
 
@@ -371,4 +383,41 @@ export async function deletePostImage(uid: string, postId: string): Promise<void
       deleteObject(ref(storage, path)).catch(() => undefined),
     ),
   );
+}
+
+/**
+ * Deletes a member's post images once the posts carrying them have expired.
+ *
+ * A Firestore TTL policy removes documents; it knows nothing about Cloud
+ * Storage, and there is no backend here to tell. So the author sweeps their
+ * own folder: everything in it belongs to a post that is gone or going, and
+ * the only thing older than the feed window is litter.
+ *
+ * Progress photos live under users/{uid}/photos and are never touched. They
+ * are a member's own timeline, not feed content, and they are kept forever.
+ */
+export async function sweepExpiredPostImages(uid: string): Promise<number> {
+  const storage = getFirebaseStorage();
+  const folder = ref(storage, `users/${uid}/posts`);
+  const cutoff = feedCutoff().getTime();
+
+  let removed = 0;
+  try {
+    const listing = await listAll(folder);
+    await Promise.all(
+      listing.items.map(async (item) => {
+        try {
+          const meta = await getMetadata(item);
+          if (new Date(meta.timeCreated).getTime() >= cutoff) return;
+          await deleteObject(item);
+          removed += 1;
+        } catch {
+          // One stubborn file is not worth abandoning the sweep.
+        }
+      }),
+    );
+  } catch {
+    // No folder yet, or storage unreachable. Nothing to clean either way.
+  }
+  return removed;
 }

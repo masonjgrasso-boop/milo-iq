@@ -84,6 +84,8 @@ export interface Membership {
   lastMilestone?: number;
   lastStreak?: number;
   lastCalorieWeek?: string;
+  /** The ISO week the weekly report last went out for. */
+  lastStatsWeek?: string;
   joinedAt?: unknown;
 }
 
@@ -366,7 +368,7 @@ export async function markGroupSeen(uid: string, groupId: string): Promise<void>
 export async function recordAnnounced(
   uid: string,
   groupId: string,
-  announced: { lastMilestone?: number; lastStreak?: number; lastCalorieWeek?: string },
+  announced: Record<string, unknown>,
 ): Promise<void> {
   await updateDoc(membershipRef(uid, groupId), announced).catch(() => undefined);
 }

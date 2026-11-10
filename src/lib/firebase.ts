@@ -85,6 +85,19 @@ export function getFirebaseAuth(): Auth {
  * Firestore with a persistent on-device cache. This is the single biggest
  * lever on cost: repeat views of data already fetched cost zero reads.
  */
+/**
+ * Points every data module at a different Firestore.
+ *
+ * The one seam in this file that production never uses. The emulator flow
+ * tests exist to prove that the real functions in src/data work against the
+ * real rules; without this they would have to re-implement the same writes by
+ * hand, which proves only that the test agrees with itself. Called with
+ * undefined to put it back.
+ */
+export function setDbForTests(instance: Firestore | undefined): void {
+  db = instance;
+}
+
 export function getDb(): Firestore {
   if (!db) {
     db = initializeFirestore(getApp(), {

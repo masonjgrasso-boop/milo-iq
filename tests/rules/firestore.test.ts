@@ -20,6 +20,9 @@ const BOB = 'bob';
 const CAROL = 'carol';
 const GROUP = 'group1';
 
+/** The expiry every post and comment must carry, inside the feed window. */
+const IN_30_DAYS = new Date(Date.now() + 29 * 86_400_000);
+
 let testEnv: RulesTestEnvironment;
 
 const asAlice = () => testEnv.authenticatedContext(ALICE).firestore();
@@ -66,10 +69,11 @@ beforeEach(async () => {
     // A feed with one post of Bob's on it, and a comment of his beneath it.
     await setDoc(doc(db, 'groups', GROUP, 'posts', 'p1'), {
       authorUid: BOB, authorName: 'Bob', kind: 'note', body: 'Morning all',
-      createdAt: new Date(), reactions: { [CAROL]: 'fire' },
+      createdAt: new Date(), expiresAt: IN_30_DAYS, reactions: { [CAROL]: 'fire' },
     });
     await setDoc(doc(db, 'groups', GROUP, 'posts', 'p1', 'comments', 'c1'), {
-      authorUid: BOB, authorName: 'Bob', text: 'and again', createdAt: new Date(),
+      authorUid: BOB, authorName: 'Bob', text: 'and again',
+      createdAt: new Date(), expiresAt: IN_30_DAYS,
     });
 
     await setDoc(doc(db, 'users', BOB), { units: 'metric' });
@@ -490,7 +494,41 @@ describe('the feed', () => {
     await assertSucceeds(
       setDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p2'), {
         authorUid: BOB, authorName: 'Bob', kind: 'note', body: 'Hello',
-        createdAt: new Date(),
+        createdAt: new Date(), expiresAt: IN_30_DAYS,
+      }),
+    );
+  });
+
+  it('refuses a post with no expiry, which would never leave the feed', async () => {
+    await assertFails(
+      setDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p2b'), {
+        authorUid: BOB, authorName: 'Bob', kind: 'note', createdAt: new Date(),
+      }),
+    );
+  });
+
+  it('refuses an expiry beyond the thirty-day window', async () => {
+    await assertFails(
+      setDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p2c'), {
+        authorUid: BOB, authorName: 'Bob', kind: 'note', createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 400 * 86_400_000),
+      }),
+    );
+  });
+
+  it('refuses an expiry that is not a timestamp at all', async () => {
+    await assertFails(
+      setDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p2d'), {
+        authorUid: BOB, authorName: 'Bob', kind: 'note', createdAt: new Date(),
+        expiresAt: 'never',
+      }),
+    );
+  });
+
+  it('stops an author pushing their own post past the window', async () => {
+    await assertFails(
+      updateDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p1'), {
+        expiresAt: new Date(Date.now() + 400 * 86_400_000),
       }),
     );
   });
@@ -499,7 +537,7 @@ describe('the feed', () => {
     await assertFails(
       setDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p3'), {
         authorUid: ALICE, authorName: 'Alice', kind: 'note', body: 'Forged',
-        createdAt: new Date(),
+        createdAt: new Date(), expiresAt: IN_30_DAYS,
       }),
     );
   });
@@ -508,6 +546,7 @@ describe('the feed', () => {
     await assertFails(
       setDoc(doc(asCarol(), 'groups', GROUP, 'posts', 'p4'), {
         authorUid: CAROL, authorName: 'Carol', kind: 'note', createdAt: new Date(),
+        expiresAt: IN_30_DAYS,
       }),
     );
   });
@@ -585,6 +624,7 @@ describe('digests', () => {
     authorName: 'Bob',
     kind: 'digest',
     createdAt: new Date(),
+    expiresAt: IN_30_DAYS,
     items: { workout: { kind: 'workout', headline: 'Finished Legs' } },
   };
 
@@ -707,7 +747,16 @@ describe('comments', () => {
     );
     await assertSucceeds(
       setDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c2'), {
-        authorUid: ALICE, authorName: 'Alice', text: 'Well done', createdAt: new Date(),
+        authorUid: ALICE, authorName: 'Alice', text: 'Well done',
+        createdAt: new Date(), expiresAt: IN_30_DAYS,
+      }),
+    );
+  });
+
+  it('refuses a comment with no expiry, which would outlive its post', async () => {
+    await assertFails(
+      setDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1', 'comments', 'cx'), {
+        authorUid: ALICE, authorName: 'Alice', text: 'Forever', createdAt: new Date(),
       }),
     );
   });
@@ -715,7 +764,8 @@ describe('comments', () => {
   it('stops a member commenting in somebody else’s name', async () => {
     await assertFails(
       setDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c3'), {
-        authorUid: BOB, authorName: 'Bob', text: 'Forged', createdAt: new Date(),
+        authorUid: BOB, authorName: 'Bob', text: 'Forged',
+        createdAt: new Date(), expiresAt: IN_30_DAYS,
       }),
     );
   });
@@ -726,7 +776,8 @@ describe('comments', () => {
     );
     await assertFails(
       setDoc(doc(asCarol(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c4'), {
-        authorUid: CAROL, authorName: 'Carol', text: 'Nope', createdAt: new Date(),
+        authorUid: CAROL, authorName: 'Carol', text: 'Nope',
+        createdAt: new Date(), expiresAt: IN_30_DAYS,
       }),
     );
   });

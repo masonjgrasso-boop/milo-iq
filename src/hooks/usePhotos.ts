@@ -7,12 +7,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/auth-context';
 import { useToast } from '../context/toast-context';
+import { useGroupSync } from './useGroupSync';
 import { deletePhoto, listPhotos, uploadPhoto, type ProgressPhoto } from '../data/photos';
 import { todayKey, toWeekKey, weekKeyLabel, type WeekKey } from '../lib/dates';
 
 export function usePhotos() {
   const { user } = useAuth();
   const notify = useToast();
+  const groups = useGroupSync();
 
   const [photos, setPhotos] = useState<ProgressPhoto[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -45,6 +47,8 @@ export function usePhotos() {
           ...(current ?? []).filter((item) => item.week !== photo.week),
         ]);
         notify(`Photo saved for ${weekKeyLabel(photo.week)}`);
+        // Straight to the feed of any group this member shares photos with.
+        groups.photo({ week: photo.week, thumbUrl: photo.thumbUrl });
       } catch (err) {
         const message =
           err instanceof Error && err.message.includes('not an image')
@@ -56,7 +60,7 @@ export function usePhotos() {
         setBusy(false);
       }
     },
-    [user, notify],
+    [user, notify, groups],
   );
 
   const remove = useCallback(

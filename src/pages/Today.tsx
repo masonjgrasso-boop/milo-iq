@@ -32,7 +32,8 @@ export function Today() {
   const notify = useToast();
   // Republishes the group mirrors and writes the day's automatic posts, at
   // most once a day. Silent, and never blocks anything on this screen.
-  useGroupSync();
+  // Today is the one screen that runs the once-a-day sync.
+  const groups = useGroupSync(true);
   const { nudges, dismiss } = useNudges();
   const [date, setDate] = useState(todayKey());
   const { day, loading, saving, error, addEntry, removeEntry, setWeight } =
@@ -173,6 +174,15 @@ export function Today() {
     return `${cal(goalProgress - nowProgress)} more to reach today’s goal.`;
   }
 
+  /**
+   * Re-checks the achievements that logging can cross: a streak, a weight
+   * milestone, a week's calorie goal met. Called after a save rather than on
+   * a timer, because a save is the only thing that can make one true.
+   */
+  function checkAchievements() {
+    groups.achievements();
+  }
+
   async function handleSaveWeight() {
     const value = Number(weightInput);
     if (!Number.isFinite(value) || value <= 0) {
@@ -181,6 +191,8 @@ export function Today() {
     }
     // useDay confirms the save, so there is nothing to announce here.
     await setWeight(toKg(value, profile!.units));
+    // A weigh-in is what crosses a weight milestone.
+    checkAchievements();
   }
 
   async function handleSaveFood(food: Pick<SavedFood, 'name' | 'servingGrams' | 'caloriesPerServing'>) {
@@ -319,7 +331,12 @@ export function Today() {
         <Eyebrow>Add food</Eyebrow>
         <FoodAdder
           savedFoods={foods}
-          onAdd={addEntry}
+          onAdd={async (entry) => {
+            await addEntry(entry);
+            // The first food of a day is what extends a logging streak and
+            // can complete a week's calorie goal.
+            checkAchievements();
+          }}
           onSaveFood={handleSaveFood}
           onUseFood={(foodId) => user && touchFood(user.uid, foodId)}
           onDeleteFood={handleDeleteFood}

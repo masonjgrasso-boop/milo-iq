@@ -38,6 +38,7 @@ import { displayNameFor } from '../lib/display';
 import { addDays, friendlyDayLabel, todayKey, weekKeyLabel } from '../lib/dates';
 import { fromKg, weightUnitLabel } from '../lib/units';
 import { Button, Card, ConfirmDialog, Eyebrow, Segmented, TextInput } from '../components/ui';
+import { useGroupSync } from '../hooks/useGroupSync';
 import { ShareChoices } from '../components/ShareChoices';
 import { Avatar, PostCard } from '../components/PostCard';
 import { PostComposer, type ComposedPost } from '../components/PostComposer';
@@ -695,7 +696,10 @@ function Sharing({
   onChanged: () => void;
 }) {
   const navigate = useNavigate();
+  const { syncNow } = useGroupSync();
   const [name, setName] = useState(group.name);
+  const [syncing, setSyncing] = useState(false);
+  const [synced, setSynced] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [handOver, setHandOver] = useState(false);
@@ -726,6 +730,31 @@ function Sharing({
     navigate('/groups', { replace: true });
   }
 
+  /**
+   * Runs the whole posting job now rather than waiting for tomorrow.
+   *
+   * Here for testing, which is what it was asked for, but it is also the
+   * honest answer to "why has nothing appeared yet": everything it does is
+   * idempotent, so pressing it can only ever help.
+   */
+  async function handleSyncNow() {
+    setSyncing(true);
+    setSynced(null);
+    const outcome = await syncNow();
+    setSyncing(false);
+
+    if (!outcome) return;
+    if (outcome.failed.length > 0) {
+      setSynced(`Some groups refused: ${outcome.failed.join(', ')}.`);
+    } else if (outcome.written === 0) {
+      setSynced('Up to date — nothing new to post.');
+    } else {
+      setSynced(
+        `Posted ${outcome.written} ${outcome.written === 1 ? 'update' : 'updates'}.`,
+      );
+    }
+  }
+
   return (
     <>
       <Card tone="muted" className="flex flex-col gap-1">
@@ -748,6 +777,18 @@ function Sharing({
           posts it made. Anything you do not tick is never written anywhere the group can
           read.
           {publishing && <span className="ml-1 text-brand">Updating…</span>}
+        </p>
+      </Card>
+
+      <Card className="flex flex-col gap-2.5">
+        <Button variant="secondary" onClick={handleSyncNow} disabled={syncing}>
+          {syncing ? 'Syncing…' : 'Sync now'}
+        </Button>
+        <p className="text-xs text-ink-faint">
+          Posts anything owed to your groups right away instead of waiting for the next
+          time you open the app. Safe to press twice &mdash; nothing is ever posted
+          tw&#105;ce.
+          {synced && <span className="mt-1 block font-bold text-brand">{synced}</span>}
         </p>
       </Card>
 

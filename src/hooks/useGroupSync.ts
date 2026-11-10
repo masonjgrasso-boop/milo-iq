@@ -1,57 +1,28 @@
-// Keeping the groups up to date, once a day.
+// Group posting, from the screens that cause it.
 //
-// Two jobs that used to happen only when somebody opened the sharing screen
-// and flipped a switch, which meant a mirror could sit weeks out of date:
+// One hook, three jobs. It runs the daily sync quietly in the background; it
+// hands back the narrow triggers that post the instant something happens; and
+// it exposes the same sync as a function the Sharing tab's "Sync now" button
+// can call and report on.
 //
-//   1. Republish each group's mirror, so what the group sees is current and
-//      a gap in logging actually shows as one.
-//   2. Add the day's automatic lines to each group's digest: this week's
-//      weight trend, a week whose calorie goal was met, today's rules if they
-//      were all kept, a weight milestone, a logging streak, this week's photo.
-//
-// It runs at most once a day per device, guarded by a note in localStorage,
-// because the whole job is a handful of reads and doing it on every
-// navigation would be waste for no gain. Every write is idempotent, so a
-// second run after the guard is cleared changes nothing.
-//
-// The three achievements that persist — milestones, streaks and a met
-// calorie week — would otherwise be announced again every day for as long as
-// they stood. Each group's pointer records the highest already announced, so
-// each is said once.
+// Nothing here throws into a screen. A failed post shows as a small error
+// through the existing toast, because a feed that quietly stops working is
+// worse than one that says so.
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/auth-context';
+import { useToast } from '../context/toast-context';
 import {
-  listMyGroups, publishShare, recordAnnounced, type Membership,
-} from '../data/groups';
-import { postToGroups, groupsFor } from '../data/autopost';
-import { listDays } from '../data/days';
-import { listRules } from '../data/rules';
-import { listExercises } from '../data/workouts';
-import { listPhotos } from '../data/photos';
-import { buildSharedSummary } from '../lib/groups';
-import {
-  calorieWeekPost, loggingStreak, milestonePost, milestonesReached, photoPost,
-  rulesPost, streakMilestone, streakPost, weightPost,
-} from '../lib/feed';
-import { goalOn } from '../lib/goals';
-import { paceSummary } from '../lib/pace';
-import { estimateMaintenance } from '../lib/maintenance';
-import { maintenanceBasis } from '../lib/pace';
+  loadMemberships, postAchievements, postPhoto, postRulesKept, syncGroups,
+  type SyncOutcome,
+} from '../data/groupFeed';
+import type { Author } from '../data/autopost';
+import type { Membership } from '../data/groups';
 import { displayNameFor } from '../lib/display';
-import { addDays, startOfWeek, todayKey, toWeekKey } from '../lib/dates';
-import { appliesOn, isMet } from '../lib/rules';
-import { firstTrend, latestTrend, trendSeries } from '../lib/trend';
-import { fromKg } from '../lib/units';
-import type { User } from 'firebase/auth';
-import type { DayLog, UserProfile } from '../lib/types';
+import { todayKey } from '../lib/dates';
+import type { DayLog, Rule } from '../lib/types';
 
 const GUARD = 'milo.groupSync';
-
-/** Far enough back to see a hundred-day streak, which is the longest we name. */
-const STREAK_LOOKBACK_DAYS = 101;
-/** Enough for the maintenance window and the four-week trend. */
-const BASE_LOOKBACK_DAYS = 28;
 
 function alreadyRanToday(uid: string, today: string): boolean {
   try {
@@ -70,209 +41,130 @@ function markRan(uid: string, today: string): void {
   }
 }
 
-async function sync(
-  user: User,
-  profile: UserProfile,
-  memberships: Membership[],
-): Promise<void> {
-  const today = todayKey();
-  const author = {
-    uid: user.uid,
-    name: displayNameFor(user),
-    ...(user.photoURL ? { photo: user.photoURL } : {}),
-  };
-
-  const sharesGoals = memberships.some((membership) => membership.shareFlags?.goals);
-  const sharesPhotos = memberships.some((membership) => membership.shareFlags?.photos);
-
-  // A streak longer than a month cannot be seen in a month of logs, so the
-  // read widens only when some group is actually listening for one. A hundred
-  // small documents once a day is well inside the free tier, and the local
-  // cache serves most of them.
-  const lookback = sharesGoals ? STREAK_LOOKBACK_DAYS : BASE_LOOKBACK_DAYS;
-
-  const [days, rules, exercises, photos] = await Promise.all([
-    listDays(user.uid, addDays(today, -(lookback - 1)), today),
-    listRules(user.uid),
-    listExercises(user.uid),
-    sharesPhotos ? listPhotos(user.uid, 8) : Promise.resolve([]),
-  ]);
-
-  // The mirror has always described the last four weeks, whatever was read.
-  const recent = days.filter((day) => day.date >= addDays(today, -(BASE_LOOKBACK_DAYS - 1)));
-
-  // ---- The mirrors -------------------------------------------------------
-  await Promise.all(
-    memberships.map((membership) => {
-      const flags = membership.shareFlags;
-      if (!flags) return Promise.resolve();
-
-      const summary = buildSharedSummary({
-        uid: user.uid,
-        displayName: author.name,
-        flags,
-        days: recent,
-        today,
-        targetCalories: profile.calorieTarget,
-        goalHistory: profile.goalHistory ?? [],
-        units: profile.units,
-        rules,
-        exercises,
-        photos: photos.map((photo) => ({ week: photo.week, thumbUrl: photo.thumbUrl })),
-      });
-      return publishShare(user.uid, membership.groupId, summary).catch(() => undefined);
-    }),
-  );
-
-  const weekStart = startOfWeek(today);
-  const thisWeek = recent.filter((day) => day.date >= weekStart);
-  const week = toWeekKey(today);
-
-  // ---- This week's weight trend, and milestones toward the goal ----------
-  const trend = trendSeries(recent);
-  const latestKg = latestTrend(trend);
-
-  if (groupsFor(memberships, 'weight').length > 0) {
-    const weekTrend = trendSeries(thisWeek);
-    const start = firstTrend(weekTrend);
-    const end = latestTrend(weekTrend);
-
-    if (start !== null && end !== null) {
-      const spark = weekTrend
-        .map((point) => point.trendKg)
-        .filter((value): value is number => value !== null)
-        .map((kg) => Number(fromKg(kg, profile.units).toFixed(2)));
-
-      await postToGroups(memberships, author, today, weightPost(end - start, profile.units, spark));
-    }
-  }
-
-  // ---- A week whose calorie goal was met ---------------------------------
-  const calorieGroups = groupsFor(memberships, 'calorieWeek');
-  if (calorieGroups.length > 0) {
-    const basis = maintenanceBasis(
-      estimateMaintenance(recent, today),
-      profile,
-      latestKg ?? undefined,
-    );
-    const pace = paceSummary({
-      days: recent,
-      start: weekStart,
-      end: today,
-      maintenanceCalories: basis.calories,
-      targetCalories: profile.calorieTarget,
-      goal: profile.goal,
-    });
-
-    // Met means the average is at or past what the goal asked for, with
-    // enough of the week logged to mean anything.
-    const met = pace.daysLogged >= 4 && pace.gapPerDay <= 0;
-    const unannounced = calorieGroups.filter(
-      (membership) => membership.lastCalorieWeek !== week,
-    );
-
-    if (met && unannounced.length > 0) {
-      await postToGroups(memberships, author, today, calorieWeekPost(pace.daysLogged));
-      await Promise.all(
-        unannounced.map((membership) =>
-          recordAnnounced(user.uid, membership.groupId, { lastCalorieWeek: week }),
-        ),
-      );
-    }
-  }
-
-  // ---- A weight milestone toward the current goal ------------------------
-  const milestoneGroups = groupsFor(memberships, 'milestone');
-  if (milestoneGroups.length > 0 && latestKg !== null) {
-    const period = goalOn(profile.goalHistory ?? [], today);
-    const startWeightKg = period?.startWeightKg ?? profile.weightKg;
-    const reached = milestonesReached(
-      startWeightKg, latestKg, period?.goal ?? profile.goal, profile.units,
-    );
-
-    const behind = milestoneGroups.filter(
-      (membership) => reached > (membership.lastMilestone ?? 0),
-    );
-    if (reached > 0 && behind.length > 0) {
-      await postToGroups(
-        memberships, author, today,
-        milestonePost(reached, profile.units, period?.goal ?? profile.goal),
-      );
-      await Promise.all(
-        behind.map((membership) =>
-          recordAnnounced(user.uid, membership.groupId, { lastMilestone: reached }),
-        ),
-      );
-    }
-  }
-
-  // ---- A logging streak worth naming -------------------------------------
-  const streakGroups = groupsFor(memberships, 'streak');
-  if (streakGroups.length > 0) {
-    const reached = streakMilestone(loggingStreak(days, today));
-    const behind = streakGroups.filter(
-      (membership) => reached > (membership.lastStreak ?? 0),
-    );
-
-    if (reached > 0 && behind.length > 0) {
-      await postToGroups(memberships, author, today, streakPost(reached));
-      await Promise.all(
-        behind.map((membership) =>
-          recordAnnounced(user.uid, membership.groupId, { lastStreak: reached }),
-        ),
-      );
-    }
-  }
-
-  // ---- Today's rules, if every one that applied was kept ------------------
-  if (groupsFor(memberships, 'rules').length > 0) {
-    const day: DayLog | undefined = recent.find((entry) => entry.date === today);
-    const due = rules.filter((rule) => rule.active && appliesOn(rule, today));
-    const met = due.filter((rule) => isMet(rule, day?.rules?.[rule.id]));
-
-    if (due.length > 0 && met.length === due.length) {
-      await postToGroups(memberships, author, today, rulesPost(due.length));
-    }
-  }
-
-  // ---- This week's progress photo ----------------------------------------
-  if (groupsFor(memberships, 'photo').length > 0) {
-    const shot = photos.find((photo) => photo.week === week);
-    if (shot) {
-      await postToGroups(memberships, author, today, photoPost(week, shot.thumbUrl));
-    }
-  }
+export interface GroupPosting {
+  /** Posts today's rules if the set handed in is now complete. */
+  rulesKept: (rules: Rule[], day: DayLog | undefined) => void;
+  /** Re-checks the streak, milestone and calorie-week achievements. */
+  achievements: () => void;
+  /** Posts a photo that has just finished uploading. */
+  photo: (photo: { week: string; thumbUrl: string }) => void;
+  /** The whole job, awaited, for the Sync now button. */
+  syncNow: () => Promise<SyncOutcome | null>;
 }
 
 /**
- * Runs the daily group sync in the background.
- *
- * Silent by design: nothing here is worth interrupting someone's morning
- * with. A group that has gone, or a network that is down, simply means the
- * sync happens tomorrow instead.
+ * @param runDaily whether this mount should perform the once-a-day sync.
+ *   Only one screen should, so Today does and the rest opt out.
  */
-export function useGroupSync(): void {
+export function useGroupSync(runDaily = false): GroupPosting {
   const { user, profile } = useAuth();
+  const notify = useToast();
+
+  const [memberships, setMemberships] = useState<Membership[]>([]);
 
   useEffect(() => {
-    if (!user || !profile) return;
+    if (!user) {
+      setMemberships([]);
+      return;
+    }
+    let cancelled = false;
+    loadMemberships(user.uid)
+      .then((found) => {
+        if (!cancelled) setMemberships(found);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // Depends on the membership list rather than reading a ref written during
+  // render, so every callback below is rebuilt when the list changes and none
+  // of them can close over a stale one.
+  const input = useCallback(() => {
+    if (!user || !profile) return null;
+    const author: Author = {
+      uid: user.uid,
+      name: displayNameFor(user),
+      ...(user.photoURL ? { photo: user.photoURL } : {}),
+    };
+    return { uid: user.uid, author, profile, memberships };
+  }, [user, profile, memberships]);
+
+  /** Reports a refusal once, naming the groups, and never throws. */
+  const report = useCallback(
+    (outcome: { failed: string[] } | null) => {
+      if (outcome && outcome.failed.length > 0) {
+        notify(`Could not post to ${outcome.failed.join(', ')}.`, 'error');
+      }
+    },
+    [notify],
+  );
+
+  // ---- The daily sync ----------------------------------------------------
+  useEffect(() => {
+    if (!runDaily || !user || !profile || memberships.length === 0) return;
     const today = todayKey();
     if (alreadyRanToday(user.uid, today)) return;
 
     let cancelled = false;
     (async () => {
+      const ready = input();
+      if (!ready) return;
       try {
-        const memberships = await listMyGroups(user.uid);
-        if (cancelled || memberships.length === 0) return;
-        await sync(user, profile, memberships);
-        if (!cancelled) markRan(user.uid, today);
+        const outcome = await syncGroups(ready);
+        if (cancelled) return;
+        report(outcome);
+        markRan(user.uid, today);
       } catch {
-        // Tomorrow, then.
+        if (!cancelled) {
+          notify('Could not update your groups. They will catch up later.', 'error');
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [user, profile]);
+  }, [runDaily, user, profile, memberships, input, report, notify]);
+
+  // ---- The immediate triggers --------------------------------------------
+  const rulesKept = useCallback(
+    (rules: Rule[], day: DayLog | undefined) => {
+      const ready = input();
+      if (!ready || ready.memberships.length === 0) return;
+      postRulesKept(ready, rules, day).then(report).catch(() => undefined);
+    },
+    [input, report],
+  );
+
+  const achievements = useCallback(() => {
+    const ready = input();
+    if (!ready || ready.memberships.length === 0) return;
+    postAchievements(ready).then(report).catch(() => undefined);
+  }, [input, report]);
+
+  const photo = useCallback(
+    (shot: { week: string; thumbUrl: string }) => {
+      const ready = input();
+      if (!ready || ready.memberships.length === 0) return;
+      postPhoto(ready, shot).then(report).catch(() => undefined);
+    },
+    [input, report],
+  );
+
+  const syncNow = useCallback(async (): Promise<SyncOutcome | null> => {
+    const ready = input();
+    if (!ready) return null;
+    try {
+      const outcome = await syncGroups(ready);
+      report(outcome);
+      return outcome;
+    } catch {
+      notify('Sync failed. Check your connection.', 'error');
+      return null;
+    }
+  }, [input, report, notify]);
+
+  return { rulesKept, achievements, photo, syncNow };
 }

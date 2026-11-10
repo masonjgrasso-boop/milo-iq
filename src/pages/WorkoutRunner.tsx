@@ -17,7 +17,7 @@ import { useExercises } from '../hooks/useExercises';
 import { getRoutine, markRoutineDone, saveRoutine } from '../data/routines';
 import { getSession, saveSession } from '../data/workouts';
 import { listMyGroups } from '../data/groups';
-import { postToGroups } from '../data/autopost';
+import { postItems } from '../data/autopost';
 import { workoutPost } from '../lib/feed';
 import { displayNameFor } from '../lib/display';
 import { friendlyDayLabel, todayKey } from '../lib/dates';
@@ -216,12 +216,12 @@ function Runner({ routineId, uid, profile }: {
       setSummary(done);
 
       // Tell any group this member shares workouts with. Never blocks the
-      // finish screen, and never surfaces an error there: the workout is
-      // saved either way, and the post is a nicety.
+      // finish screen: the workout is saved either way. A group that refuses
+      // the post is worth a quiet word, though, rather than silence.
       if (user) {
         listMyGroups(uid)
           .then((memberships) =>
-            postToGroups(
+            postItems(
               memberships,
               {
                 uid,
@@ -229,10 +229,15 @@ function Runner({ routineId, uid, profile }: {
                 ...(user.photoURL ? { photo: user.photoURL } : {}),
               },
               date,
-              workoutPost(routine.name, done.newBests.map((best) => best.name)),
+              [workoutPost(routine.name, done.newBests.map((best) => best.name))],
             ),
           )
-          .catch(() => undefined);
+          .then((outcome) => {
+            if (outcome.failed.length > 0) {
+              notify(`Could not post to ${outcome.failed.join(', ')}.`, 'error');
+            }
+          })
+          .catch(() => notify('Could not post this workout to your groups.', 'error'));
       }
     } catch {
       notify('Could not finish the workout. Check your connection.', 'error');

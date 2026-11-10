@@ -158,7 +158,45 @@ firebase deploy --only hosting
 Firebase gives you a free `*.web.app` URL with HTTPS. On a phone, open it and use
 **Add to Home Screen** to install it as an app.
 
-### 10. Lock it down before sharing it
+### 10. Switch on the feed's time-to-live
+
+Group feeds keep thirty days. Every post and comment is written with an
+`expiresAt` date thirty days out — the security rules refuse one without it —
+and Firestore deletes them when that date passes, which is the only way to have
+it happen with no backend and whether or not anybody opens the app again.
+
+Firestore needs to be told which field to watch. It is two policies, because
+deleting a post does not cascade to its comments:
+
+```bash
+gcloud firestore fields ttls update expiresAt \
+  --collection-group=posts --enable-ttl --project=YOUR_PROJECT_ID
+
+gcloud firestore fields ttls update expiresAt \
+  --collection-group=comments --enable-ttl --project=YOUR_PROJECT_ID
+```
+
+Or in the console: **Firestore > Time-to-live (TTL)** > **Create policy**, with
+collection group `posts` and field `expiresAt`, then the same again for
+`comments`.
+
+Two things worth knowing:
+
+- Deletion is not instant. Google documents it as within 24 hours of expiry,
+  so the app also filters the feed to the last thirty days on read. A post
+  past its date never shows even if it is still in the database.
+- A TTL policy deletes documents, not files. Images attached to feed posts are
+  swept by the app instead: each member's own `users/{uid}/posts/` folder is
+  tidied of anything older than the window. Progress photos live under
+  `users/{uid}/photos/` and are never touched — those are a member's own
+  timeline and are kept forever.
+
+Until the policies are on, nothing breaks: posts simply stay longer than
+thirty days in the database, while the app still shows only thirty.
+
+---
+
+### 11. Lock it down before sharing it
 
 The security rules are what actually protect your data, and they are already
 deployed. These two steps are the layer on top: they make it harder for someone
@@ -282,6 +320,10 @@ Two deliberate choices worth knowing about:
   on one Tuesday is one card with four lines, not four cards. The card's id is the member
   and the day and each line is a keyed entry on it, which also makes writing one
   idempotent: there is no backend here to remove a duplicate.
+- **Achievements post the moment they happen; the weekly report waits for the week.**
+  Rules kept, a workout finished and a photo uploaded go straight out. The week's weight
+  trend and calorie average go out once at the top of a new week, and the week they went
+  out for is recorded, so opening the app five times on Monday posts them once.
 - **Only photo thumbnails are shared.** A Firebase download URL is a bearer token that
   cannot be revoked without Cloud Functions, so the full-size image is never placed in a
   group-readable document.
@@ -298,8 +340,13 @@ Two deliberate choices worth knowing about:
 - Invite codes can be looked up but not listed, so they cannot be enumerated.
 - Members write only their own membership record, so nobody can add someone else to a
   group or alter another member's share settings.
-- 110 rule tests run against the real emulator and assert the denials, not just the
-  permissions.
+- 133 rule tests run against the real emulator and assert the denials, not just the
+  permissions. Sixteen of them walk the whole two-user feed flow — one member opts in,
+  keeps their rules, finishes a workout, gets a weekly report, and the other reads it —
+  through the same functions the app calls, so a missing rule shows up there rather
+  than as a feed that stays empty on a phone.
+- A post or comment without an expiry inside the thirty-day window is refused, so
+  nothing can be written to a feed that never leaves it.
 - A member may move a group's "something was posted" marker and change nothing else on
   it, so the dot on the Groups tab costs one small read rather than a wider grant.
 - App Check can attest that requests come from your app rather than a script, and the

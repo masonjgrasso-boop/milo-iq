@@ -37,9 +37,17 @@ export function useDay(date: DayKey) {
     };
   }, [uid, date]);
 
+  /**
+   * Saves a day and, on success, hands back what was saved.
+   *
+   * The return value is what lets a caller act on the day as it now stands
+   * without rebuilding it: the Rules tab uses it to decide whether the tick
+   * that just landed completed the day's set. Nothing comes back when the
+   * write failed, so an action can never follow a save that did not happen.
+   */
   const persist = useCallback(
-    async (next: DayLog, confirmation: string) => {
-      if (!uid || !profile) return;
+    async (next: DayLog, confirmation: string): Promise<DayLog | undefined> => {
+      if (!uid || !profile) return undefined;
       // Show the change straight away; logging should never feel like waiting.
       setDay(next);
       setSaving(true);
@@ -50,9 +58,11 @@ export function useDay(date: DayKey) {
         // Confirm it landed. Without this a save is indistinguishable from
         // nothing happening at all.
         notify(confirmation);
+        return next;
       } catch {
         setError('Could not save. Your change is still here — check your connection.');
         notify('Could not save. Check your connection.', 'error');
+        return undefined;
       } finally {
         setSaving(false);
       }

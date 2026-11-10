@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  calorieWeekPost, digestId, digestItems, itemsFor, loggingStreak, milestonePost,
-  milestonesReached, milestoneStepKg, nudgeId, nudgeMessage, photoPost, rulesPost,
-  streakMilestone, streakPost, tallyReactions, toggleReaction, visiblePosts,
-  weightPost, withoutItems, workoutPost,
-  ITEM_FLAG, ITEM_ORDER, MAX_BODY, MILESTONE_KG, MILESTONE_LB, PAGE_SIZE, REACTIONS,
-  STREAK_MILESTONES,
+  calorieAvgPost, calorieWeekPost, digestId, digestItems, expiryFrom, feedCutoff,
+  itemsFor, loggingStreak, milestonePost, milestonesReached, milestoneStepKg, nudgeId,
+  nudgeMessage, photoPost, rulesPost, streakMilestone, streakPost, tallyReactions,
+  toggleReaction, visiblePosts, weightPost, withoutItems, workoutPost,
+  FEED_DAYS, ITEM_FLAG, ITEM_ORDER, MAX_BODY, MILESTONE_KG, MILESTONE_LB, PAGE_SIZE,
+  REACTIONS, STREAK_MILESTONES, WEEKLY_ITEMS,
   type FeedPost, type ItemKind, type PostItem, type Reaction,
 } from './feed';
 import { lbToKg } from './units';
@@ -62,12 +62,16 @@ describe('the digest', () => {
 });
 
 describe('which flag gates which line', () => {
-  it('puts the two numbers under stats', () => {
+  it('puts the weekly figures under stats', () => {
     expect(ITEM_FLAG.weight).toBe('stats');
-    expect(ITEM_FLAG.calorieWeek).toBe('stats');
+    expect(ITEM_FLAG.calorieAvg).toBe('stats');
   });
 
-  it('puts every achievement under goals', () => {
+  it('puts every achievement under goals, meeting a calorie goal included', () => {
+    // Reporting the week's average is a stat; hitting the goal is an
+    // achievement. They are separate lines under separate flags, so somebody
+    // can share the good news without sharing the number.
+    expect(ITEM_FLAG.calorieWeek).toBe('goals');
     expect(ITEM_FLAG.rules).toBe('goals');
     expect(ITEM_FLAG.workout).toBe('goals');
     expect(ITEM_FLAG.milestone).toBe('goals');
@@ -75,10 +79,73 @@ describe('which flag gates which line', () => {
   });
 
   it('can name the lines a flag is responsible for', () => {
-    expect(itemsFor('stats').sort()).toEqual(['calorieWeek', 'weight']);
-    expect(itemsFor('goals').sort()).toEqual(['milestone', 'rules', 'streak', 'workout']);
+    expect(itemsFor('stats').sort()).toEqual(['calorieAvg', 'weight']);
+    expect(itemsFor('goals').sort())
+      .toEqual(['calorieWeek', 'milestone', 'rules', 'streak', 'workout']);
     expect(itemsFor('photos')).toEqual(['photo']);
     expect(itemsFor('activity')).toEqual([]);
+  });
+
+  it('marks exactly the two lines that are a weekly report', () => {
+    expect(WEEKLY_ITEMS.sort()).toEqual(['calorieAvg', 'weight']);
+    // Everything else happens when it happens.
+    for (const kind of WEEKLY_ITEMS) {
+      expect(ITEM_FLAG[kind]).toBe('stats');
+    }
+  });
+});
+
+describe('the thirty-day window', () => {
+  const now = new Date('2026-11-09T12:00:00Z');
+
+  it('expires a post thirty days out', () => {
+    expect(FEED_DAYS).toBe(30);
+    const at = expiryFrom(now);
+    expect(Math.round((at.getTime() - now.getTime()) / 86_400_000)).toBe(30);
+  });
+
+  it('cuts the feed off thirty days back', () => {
+    const at = feedCutoff(now);
+    expect(Math.round((now.getTime() - at.getTime()) / 86_400_000)).toBe(30);
+  });
+
+  it('puts the cutoff before the expiry of anything written now', () => {
+    // Which is what makes the date filter and the TTL policy agree.
+    expect(feedCutoff(now).getTime()).toBeLessThan(expiryFrom(now).getTime());
+  });
+
+  it('does not mutate the date it is given', () => {
+    const original = new Date(now);
+    expiryFrom(now);
+    feedCutoff(now);
+    expect(now.getTime()).toBe(original.getTime());
+  });
+});
+
+describe('calorieAvgPost', () => {
+  it('reports the average and how it sat against the goal', () => {
+    const item = calorieAvgPost(2180, 2000, 6);
+    expect(item.kind).toBe('calorieAvg');
+    expect(item.headline).toBe('Averaged 2,180 a day this week');
+    expect(item.detail).toContain('180 above their 2,000 goal');
+    expect(item.detail).toContain('6 days logged');
+  });
+
+  it('reads the other way when the week came in under', () => {
+    expect(calorieAvgPost(1850, 2000, 7).detail).toContain('150 below their 2,000 goal');
+  });
+
+  it('calls a near miss right on it rather than inventing a direction', () => {
+    expect(calorieAvgPost(2010, 2000, 7).detail).toContain('Right on their 2,000 goal');
+  });
+
+  it('counts one day as a day', () => {
+    expect(calorieAvgPost(2000, 2000, 1).detail).toContain('1 day logged');
+  });
+
+  it('posts whatever the week said, good or bad', () => {
+    // The point of it being a stat rather than an achievement.
+    expect(calorieAvgPost(3200, 2000, 7).headline).toBe('Averaged 3,200 a day this week');
   });
 });
 

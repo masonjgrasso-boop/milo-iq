@@ -27,6 +27,7 @@ export type PostKind = 'note' | 'digest';
 /** The things the app will speak up about. */
 export type ItemKind =
   | 'weight'
+  | 'calorieAvg'
   | 'calorieWeek'
   | 'rules'
   | 'workout'
@@ -42,8 +43,13 @@ export type ItemKind =
  * nothing: choosing to write it is the choice.
  */
 export const ITEM_FLAG: Record<ItemKind, ShareKey> = {
+  // Stats are the weekly figures, reported whatever they say.
   weight: 'stats',
-  calorieWeek: 'stats',
+  calorieAvg: 'stats',
+  // Goals hit are achievements: they only ever appear because something
+  // went right, which is why meeting the calorie goal belongs here and the
+  // bare weekly average belongs above.
+  calorieWeek: 'goals',
   rules: 'goals',
   workout: 'goals',
   milestone: 'goals',
@@ -51,9 +57,19 @@ export const ITEM_FLAG: Record<ItemKind, ShareKey> = {
   photo: 'photos',
 };
 
+/**
+ * Which lines are the weekly report rather than something that just
+ * happened.
+ *
+ * These two post once at the top of a week, the next time the member opens
+ * the app, rather than the moment they are true.
+ */
+export const WEEKLY_ITEMS: ItemKind[] = ['weight', 'calorieAvg'];
+
 /** The order lines read in on a card, best news first. */
 export const ITEM_ORDER: ItemKind[] = [
-  'milestone', 'streak', 'calorieWeek', 'rules', 'workout', 'weight', 'photo',
+  'milestone', 'streak', 'calorieWeek', 'rules', 'workout', 'weight', 'calorieAvg',
+  'photo',
 ];
 
 export type Reaction = 'thumb' | 'fire' | 'flex';
@@ -103,6 +119,31 @@ export interface FeedPost {
 
 /** How many posts a page of the feed holds. */
 export const PAGE_SIZE = 20;
+
+/**
+ * How long a post stays in a feed.
+ *
+ * A feed is for what people are doing now, so it is a rolling window rather
+ * than an archive nobody scrolls to the bottom of. Every post and comment
+ * carries the date it should go, and a Firestore TTL policy on that field
+ * does the deleting — which is the only way to have it happen without a
+ * backend, and happens whether or not anybody opens the app again.
+ */
+export const FEED_DAYS = 30;
+
+/** When a post written now should be deleted. */
+export function expiryFrom(now: Date = new Date()): Date {
+  const at = new Date(now);
+  at.setDate(at.getDate() + FEED_DAYS);
+  return at;
+}
+
+/** The oldest post a feed should show, whether or not the TTL has caught up. */
+export function feedCutoff(now: Date = new Date()): Date {
+  const at = new Date(now);
+  at.setDate(at.getDate() - FEED_DAYS);
+  return at;
+}
 
 /** The longest a note can be, so one post cannot fill the screen. */
 export const MAX_BODY = 500;
@@ -181,6 +222,34 @@ export function calorieWeekPost(daysLogged: number): PostItem {
     kind: 'calorieWeek',
     headline: 'Hit their calorie goal this week',
     detail: `${daysLogged} ${daysLogged === 1 ? 'day' : 'days'} logged`,
+  };
+}
+
+/**
+ * The week's calorie average against the goal, whatever it says.
+ *
+ * Part of stats rather than goals: it reports a number instead of
+ * celebrating one, so it posts in a week that went badly as well as a week
+ * that went well. Someone who only wants the good news shares goals and
+ * leaves this off.
+ */
+export function calorieAvgPost(
+  avgIntake: number,
+  target: number,
+  daysLogged: number,
+): PostItem {
+  const difference = avgIntake - target;
+  const size = Math.abs(Math.round(difference)).toLocaleString();
+
+  const detail = Math.abs(difference) < 25
+    ? `Right on their ${target.toLocaleString()} goal`
+    : `${size} ${difference > 0 ? 'above' : 'below'} their ` +
+      `${target.toLocaleString()} goal`;
+
+  return {
+    kind: 'calorieAvg',
+    headline: `Averaged ${Math.round(avgIntake).toLocaleString()} a day this week`,
+    detail: `${detail} · ${daysLogged} ${daysLogged === 1 ? 'day' : 'days'} logged`,
   };
 }
 
