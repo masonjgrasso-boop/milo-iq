@@ -79,7 +79,7 @@ export function Layout({ children }: {
           bg-surface px-3 py-6 lg:flex lg:w-[248px]"
       >
         <NavLink to="/" className="mb-6 flex items-center gap-2.5 px-2">
-          <img src="/milo-mark.png" alt="" className="h-9 w-9 object-contain" />
+          <img src="/milo-mark.png" alt="" className="h-9 w-14 object-contain" />
           <span className="font-wordmark text-xl leading-none tracking-[0.02em] text-brand uppercase">
             Milo IQ
           </span>

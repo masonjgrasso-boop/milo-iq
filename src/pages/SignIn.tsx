@@ -21,7 +21,7 @@ export function SignIn() {
         }}
       >
         <div className="flex h-[52px] w-fit items-center gap-3 rounded-full bg-canvas pr-[18px] pl-3 shadow-lift">
-          <img src="/milo-mark.png" alt="" className="h-10 w-10 object-contain" />
+          <img src="/milo-mark.png" alt="" className="h-10 w-[62px] object-contain" />
           <span aria-hidden="true" className="h-5 w-px bg-line-in" />
           <span
             className="px-1 py-0.5 text-[17px] leading-none font-black text-brand uppercase italic"

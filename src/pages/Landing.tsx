@@ -47,7 +47,7 @@ export function Landing() {
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-5 lg:px-8">
         <span className="flex items-center gap-2.5">
-          <img src="/milo-mark.png" alt="" className="h-9 w-9 object-contain" />
+          <img src="/milo-mark.png" alt="" className="h-9 w-14 object-contain" />
           <span className="font-wordmark text-xl leading-none tracking-[0.02em] text-brand uppercase">
             Milo IQ
           </span>

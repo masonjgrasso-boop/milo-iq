@@ -99,9 +99,9 @@ export function More() {
       </p>
 
       <img
-        src="/milo-script.png"
+        src="/milo-mark.png"
         alt=""
-        className="mt-1 w-24 self-center opacity-25"
+        className="mt-1 w-28 self-center opacity-25"
       />
     </Page>
   );
