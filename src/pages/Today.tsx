@@ -17,6 +17,9 @@ import { maintenanceBasis, paceSummary } from '../lib/pace';
 import { latestTrend, trendSeries } from '../lib/trend';
 import type { SavedFood } from '../lib/types';
 import { Button, Card, Eyebrow, HeroCard, IconButton, UnitInput } from '../components/ui';
+import { useGroupSync } from '../hooks/useGroupSync';
+import { useNudges } from '../hooks/useNudges';
+import { NudgeBanner } from '../components/NudgeBanner';
 import { FoodAdder } from '../components/FoodAdder';
 import { CatchUpCard } from '../components/CatchUpCard';
 import { PaceCard } from '../components/PaceCard';
@@ -27,6 +30,10 @@ const cal = (value: number): string => Math.abs(Math.round(value)).toLocaleStrin
 export function Today() {
   const { user, profile } = useAuth();
   const notify = useToast();
+  // Republishes the group mirrors and writes the day's automatic posts, at
+  // most once a day. Silent, and never blocks anything on this screen.
+  useGroupSync();
+  const { nudges, dismiss } = useNudges();
   const [date, setDate] = useState(todayKey());
   const { day, loading, saving, error, addEntry, removeEntry, setWeight } =
     useDay(date);
@@ -221,6 +228,8 @@ export function Today() {
         </>
       }
     >
+      <NudgeBanner nudges={nudges} onDismiss={dismiss} />
+
       {/* One column on a phone. On desktop the day's standing sits beside
           the two things you came here to type into. */}
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5">

@@ -36,7 +36,7 @@ Three things follow from that:
 | **Workouts** | Sets, weight and reps, prefilled from last time |
 | **Strength graph** | Estimated 1RM, so more reps counts as progress too |
 | **Progress photos** | One a week, compressed on device, with side-by-side comparison |
-| **Groups and coaching** | Share only what you tick; coaches can leave notes |
+| **Groups** | A private feed for a handful of people: posts, reactions, comments, and a nudge when somebody goes quiet. Share only what you tick |
 | **Your data** | Full JSON/CSV export and real account deletion |
 
 ---
@@ -269,9 +269,12 @@ checks — so access ends immediately.
 
 Two deliberate choices worth knowing about:
 
-- **Weight is shared as a change, not a number.** What a group or coach needs is the
-  direction of travel; the figure on the scale is a far bigger ask than most people
-  realise.
+- **Weight is shared as a change, not a number.** What a group needs is the direction
+  of travel; the figure on the scale is a far bigger ask than most people realise.
+- **One admin per group, and the role is caretaking only.** The admin invites, removes,
+  renames, deletes, and can take down a post or a comment. They get no extra sight of
+  anybody's data — there is deliberately no role that can read more than its owner
+  shared.
 - **Only photo thumbnails are shared.** A Firebase download URL is a bearer token that
   cannot be revoked without Cloud Functions, so the full-size image is never placed in a
   group-readable document.
@@ -280,12 +283,15 @@ Two deliberate choices worth knowing about:
 
 ## Security
 
-- Users can read and write only their own data. A coach cannot see a member's raw logs —
-  only the summary that member chose to publish.
+- Users can read and write only their own data. Nobody, admin included, can see a
+  member's raw logs — only the summary and the posts that member chose to publish.
+- A member can never change their own role, so nobody can promote themselves to admin.
+- A reaction write can only touch the writer's own key in the post's reaction map, so
+  nobody can react on somebody else's behalf or clear theirs.
 - Invite codes can be looked up but not listed, so they cannot be enumerated.
 - Members write only their own membership record, so nobody can add someone else to a
   group or alter another member's share settings.
-- 59 rule tests run against the real emulator and assert the denials, not just the
+- 103 rule tests run against the real emulator and assert the denials, not just the
   permissions.
 - App Check can attest that requests come from your app rather than a script, and the
   web API key can be restricted to your own domains. Both are set up in step 10 and

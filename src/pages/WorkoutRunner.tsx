@@ -16,6 +16,10 @@ import { useToast } from '../context/toast-context';
 import { useExercises } from '../hooks/useExercises';
 import { getRoutine, markRoutineDone, saveRoutine } from '../data/routines';
 import { getSession, saveSession } from '../data/workouts';
+import { listMyGroups } from '../data/groups';
+import { postToGroups } from '../data/autopost';
+import { workoutPost } from '../lib/feed';
+import { displayNameFor } from '../lib/display';
 import { friendlyDayLabel, todayKey } from '../lib/dates';
 import { DEFAULT_SETS } from '../lib/routines';
 import { type WorkoutSet } from '../lib/strength';
@@ -69,6 +73,9 @@ function Runner({ routineId, uid, profile }: {
   profile: UserProfile;
 }) {
   const notify = useToast();
+  // The name and picture a finished-workout post is written under. Runner
+  // only receives the uid, which is all the rest of the screen needs.
+  const { user } = useAuth();
   const { exercises, addExercise, failed: libraryFailed } = useExercises();
   const date = todayKey();
   const unit = weightUnitLabel(profile.units);
@@ -198,16 +205,36 @@ function Runner({ routineId, uid, profile }: {
     setFinishing(true);
     try {
       await markRoutineDone(uid, routine.id, date);
-      setSummary(
-        summarizeWorkout(
-          slots.map((slot) => ({
-            exerciseId: slot.exerciseId,
-            name: slot.name,
-            sets: slot.rows.filter((row) => row.logged).map((row) => parseRow(row, profile)),
-            previousBestKg: slot.startingBestKg,
-          })),
-        ),
+      const done = summarizeWorkout(
+        slots.map((slot) => ({
+          exerciseId: slot.exerciseId,
+          name: slot.name,
+          sets: slot.rows.filter((row) => row.logged).map((row) => parseRow(row, profile)),
+          previousBestKg: slot.startingBestKg,
+        })),
       );
+      setSummary(done);
+
+      // Tell any group this member shares workouts with. Never blocks the
+      // finish screen, and never surfaces an error there: the workout is
+      // saved either way, and the post is a nicety.
+      if (user) {
+        listMyGroups(uid)
+          .then((memberships) =>
+            postToGroups(
+              memberships,
+              {
+                uid,
+                name: displayNameFor(user),
+                ...(user.photoURL ? { photo: user.photoURL } : {}),
+              },
+              'workout',
+              `${date}_${routine.id}`,
+              workoutPost(routine.name, done.newBests.map((best) => best.name)),
+            ),
+          )
+          .catch(() => undefined);
+      }
     } catch {
       notify('Could not finish the workout. Check your connection.', 'error');
     } finally {

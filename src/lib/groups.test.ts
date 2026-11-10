@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   generateInviteCode, normalizeInviteCode, isValidInviteCode, INVITE_CODE_LENGTH,
-  buildSharedSummary, NO_SHARING, SHARE_KEYS, SHARE_LABELS, SHARE_DESCRIPTIONS,
+  buildSharedSummary, daysInactive, isInactive,
+  DEFAULT_SHARING, INACTIVE_AFTER_DAYS, NO_SHARING,
+  SHARE_KEYS, SHARE_LABELS, SHARE_DESCRIPTIONS,
   type ShareFlags, type ShareInput,
 } from './groups';
 import { rangeKeys } from './dates';
-import type { DayLog, Exercise, Rule } from './types';
+import type { DayLog, Exercise, GoalPeriod, Rule } from './types';
 
 describe('invite codes', () => {
   it('is the expected length', () => {
@@ -65,7 +67,7 @@ const exercises: Exercise[] = [
 ];
 
 const allOn: ShareFlags = {
-  calories: true, weight: true, workouts: true, rules: true, photos: true,
+  calories: true, weight: true, workouts: true, rules: true, photos: true, activity: true,
 };
 
 const input = (flags: ShareFlags): ShareInput => ({
@@ -184,5 +186,96 @@ describe('share metadata', () => {
     for (const key of SHARE_KEYS) {
       expect(NO_SHARING[key]).toBe(false);
     }
+  });
+});
+
+describe('what a new member starts with', () => {
+  it('shares nothing substantive until they say so', () => {
+    for (const key of SHARE_KEYS) {
+      if (key === 'activity') continue;
+      expect(DEFAULT_SHARING[key]).toBe(false);
+    }
+  });
+
+  it('does let the group see a gap in logging, which is the point of a group', () => {
+    // It carries no data, only the fact that a gap exists, and the sharing
+    // screen says so. A group that cannot see a gap cannot nudge anyone.
+    expect(DEFAULT_SHARING.activity).toBe(true);
+    expect(NO_SHARING.activity).toBe(false);
+  });
+});
+
+describe('inactivity', () => {
+  it('counts the days since the last log', () => {
+    expect(daysInactive('2026-03-06', '2026-03-09')).toBe(3);
+    expect(daysInactive('2026-03-09', '2026-03-09')).toBe(0);
+  });
+
+  it('says nothing about someone who has never logged', () => {
+    expect(daysInactive(undefined, '2026-03-09')).toBe(0);
+    expect(isInactive(undefined, '2026-03-09')).toBe(false);
+  });
+
+  it('starts mentioning it at three days, not before', () => {
+    expect(INACTIVE_AFTER_DAYS).toBe(3);
+    expect(isInactive('2026-03-07', '2026-03-09')).toBe(false);
+    expect(isInactive('2026-03-06', '2026-03-09')).toBe(true);
+  });
+
+  it('never reports a negative gap from a future date', () => {
+    expect(daysInactive('2026-03-10', '2026-03-09')).toBe(0);
+  });
+});
+
+describe('the last logged day', () => {
+  it('is shared only when the activity flag is on', () => {
+    expect(buildSharedSummary(input(allOn)).lastLoggedDay).toBe('2026-03-06');
+    expect(buildSharedSummary(input(NO_SHARING)).lastLoggedDay).toBeUndefined();
+  });
+
+  it('is the last day with food on it, not merely the last day in range', () => {
+    const withGap = input({ ...NO_SHARING, activity: true });
+    withGap.days = [
+      ...days.slice(0, 3),
+      { date: '2026-03-05', calories: 0, entries: [] },
+      { date: '2026-03-06', calories: 0, entries: [] },
+    ];
+    expect(buildSharedSummary(withGap).lastLoggedDay).toBe('2026-03-04');
+  });
+
+  it('is absent for a member who has logged nothing at all', () => {
+    const blank = input({ ...NO_SHARING, activity: true });
+    blank.days = days.map((day) => ({ ...day, calories: 0 }));
+    expect(buildSharedSummary(blank).lastLoggedDay).toBeUndefined();
+  });
+});
+
+describe('the weekly deficit across a goal change', () => {
+  // The week runs Mon 2026-03-02 to Fri 2026-03-06, five days at 1,900.
+  const history: GoalPeriod[] = [
+    { startDate: '2026-01-01', goal: 'lose', targetRateKgPerWeek: 0.45, calorieTarget: 2000 },
+    { startDate: '2026-03-05', goal: 'gain', targetRateKgPerWeek: 0.2, calorieTarget: 2600 },
+  ];
+
+  it('scores each day against the goal that was active on it', () => {
+    const shared = buildSharedSummary({ ...input({ ...NO_SHARING, calories: true }), goalHistory: history });
+
+    // Three days on a 2,000 target and two on 2,600 blends to 2,240, so five
+    // days at 1,900 sit 1,700 under. Against today's 2,000 alone it would
+    // have read 500, flattering a week the member spent mostly losing.
+    expect(shared.calories?.deficit).toBe(1700);
+  });
+
+  it('still shows today’s target, which is the number that means something', () => {
+    const shared = buildSharedSummary({ ...input({ ...NO_SHARING, calories: true }), goalHistory: history });
+    expect(shared.calories?.target).toBe(2000);
+  });
+
+  it('is unchanged for a member who has never changed goals', () => {
+    const plain = buildSharedSummary(input({ ...NO_SHARING, calories: true }));
+    const empty = buildSharedSummary({ ...input({ ...NO_SHARING, calories: true }), goalHistory: [] });
+    expect(plain.calories).toEqual(empty.calories);
+    // Five days at 1,900 against a flat 2,000 target.
+    expect(plain.calories?.deficit).toBe(500);
   });
 });

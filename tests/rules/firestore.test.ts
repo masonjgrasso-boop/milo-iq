@@ -10,7 +10,10 @@ import {
   assertFails, assertSucceeds, initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query } from 'firebase/firestore';
+import {
+  collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, query, setDoc,
+  updateDoc, where,
+} from 'firebase/firestore';
 
 const ALICE = 'alice';
 const BOB = 'bob';
@@ -46,10 +49,10 @@ beforeEach(async () => {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
     await setDoc(doc(db, 'groups', GROUP), {
-      name: 'Test group', inviteCode: 'AB3K9P', coachUid: ALICE, createdBy: ALICE,
+      name: 'Test group', inviteCode: 'AB3K9P', adminUid: ALICE, createdBy: ALICE,
     });
     await setDoc(doc(db, 'groups', GROUP, 'members', ALICE), {
-      uid: ALICE, displayName: 'Alice', role: 'coach', shareFlags: {},
+      uid: ALICE, displayName: 'Alice', role: 'admin', shareFlags: {},
     });
     await setDoc(doc(db, 'groups', GROUP, 'members', BOB), {
       uid: BOB, displayName: 'Bob', role: 'member', shareFlags: {},
@@ -60,6 +63,15 @@ beforeEach(async () => {
     await setDoc(doc(db, 'inviteCodes', 'AB3K9P'), {
       groupId: GROUP, name: 'Test group', createdBy: ALICE,
     });
+    // A feed with one post of Bob's on it, and a comment of his beneath it.
+    await setDoc(doc(db, 'groups', GROUP, 'posts', 'p1'), {
+      authorUid: BOB, authorName: 'Bob', kind: 'note', body: 'Morning all',
+      createdAt: new Date(), reactions: { [CAROL]: 'fire' },
+    });
+    await setDoc(doc(db, 'groups', GROUP, 'posts', 'p1', 'comments', 'c1'), {
+      authorUid: BOB, authorName: 'Bob', text: 'and again', createdAt: new Date(),
+    });
+
     await setDoc(doc(db, 'users', BOB), { units: 'metric' });
     await setDoc(doc(db, 'users', BOB, 'days', '2026-03-04'), { date: '2026-03-04', calories: 2000 });
   });
@@ -209,9 +221,9 @@ describe('a user and their own data', () => {
   });
 
   it('does not expose goal history through the group mirror', async () => {
-    // Alice coaches Bob's group and can read the summary he chose to publish.
-    // That mirror is a separate document, so his profile — and with it his
-    // goals, rate and body figures — stays shut to her.
+    // Alice administers Bob's group and can read the summary he chose to
+    // publish. That mirror is a separate document, so his profile — and with
+    // it his goals, rate and body figures — stays shut to her.
     await assertSucceeds(
       getDoc(doc(asAlice(), 'groups', GROUP, 'members', BOB, 'shared', 'summary')),
     );
@@ -232,10 +244,10 @@ describe('group documents', () => {
     await assertFails(getDocs(query(collection(asBob(), 'groups'))));
   });
 
-  it('lets a user create a group they own', async () => {
+  it('lets a user create a group they own and administer', async () => {
     await assertSucceeds(
       setDoc(doc(asCarol(), 'groups', 'new1'), {
-        name: 'Carol group', inviteCode: 'XY7M2Q', coachUid: null, createdBy: CAROL,
+        name: 'Carol group', inviteCode: 'XY7M2Q', adminUid: CAROL, createdBy: CAROL,
       }),
     );
   });
@@ -243,13 +255,92 @@ describe('group documents', () => {
   it('stops a user creating a group attributed to someone else', async () => {
     await assertFails(
       setDoc(doc(asCarol(), 'groups', 'new2'), {
-        name: 'Fake', inviteCode: 'XY7M2R', coachUid: null, createdBy: ALICE,
+        name: 'Fake', inviteCode: 'XY7M2R', adminUid: CAROL, createdBy: ALICE,
       }),
     );
   });
 
-  it('stops a non-coach member editing the group', async () => {
+  it('stops a group arriving with somebody else already its admin', async () => {
+    // Otherwise a group could be created pre-captured by another account.
+    await assertFails(
+      setDoc(doc(asCarol(), 'groups', 'new3'), {
+        name: 'Captured', inviteCode: 'XY7M2S', adminUid: ALICE, createdBy: CAROL,
+      }),
+    );
+  });
+
+  it('stops a plain member editing the group', async () => {
     await assertFails(setDoc(doc(asBob(), 'groups', GROUP), { name: 'Renamed' }));
+  });
+});
+
+describe('what the admin can do, and only the admin', () => {
+  it('renames the group', async () => {
+    await assertSucceeds(updateDoc(doc(asAlice(), 'groups', GROUP), { name: 'Renamed' }));
+    await assertFails(updateDoc(doc(asBob(), 'groups', GROUP), { name: 'Nope' }));
+  });
+
+  it('deletes the group', async () => {
+    await assertFails(deleteDoc(doc(asBob(), 'groups', GROUP)));
+    await assertSucceeds(deleteDoc(doc(asAlice(), 'groups', GROUP)));
+  });
+
+  it('hands the group on by changing roles', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asAlice(), 'groups', GROUP, 'members', BOB), { role: 'admin' }),
+    );
+    await assertSucceeds(updateDoc(doc(asAlice(), 'groups', GROUP), { adminUid: BOB }));
+  });
+
+  it('stops a member promoting themselves', async () => {
+    // The one thing that would make the admin role meaningless.
+    await assertFails(
+      updateDoc(doc(asBob(), 'groups', GROUP, 'members', BOB), { role: 'admin' }),
+    );
+    await assertFails(updateDoc(doc(asBob(), 'groups', GROUP), { adminUid: BOB }));
+  });
+
+  it('removes another member', async () => {
+    await assertSucceeds(deleteDoc(doc(asAlice(), 'groups', GROUP, 'members', BOB)));
+  });
+
+  it('stops a member removing anybody else', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'groups', GROUP, 'members', CAROL), {
+        uid: CAROL, displayName: 'Carol', role: 'member', shareFlags: {},
+      });
+    });
+    await assertFails(deleteDoc(doc(asBob(), 'groups', GROUP, 'members', CAROL)));
+  });
+
+  it('takes a removed member’s shared data with them', async () => {
+    await assertSucceeds(
+      deleteDoc(doc(asAlice(), 'groups', GROUP, 'members', BOB, 'shared', 'summary')),
+    );
+  });
+
+  it('stops one member deleting another member’s shared data', async () => {
+    await assertFails(
+      deleteDoc(doc(asBob(), 'groups', GROUP, 'members', ALICE, 'shared', 'summary')),
+    );
+  });
+
+  it('renames and deletes the invite, which a member cannot', async () => {
+    await assertFails(
+      updateDoc(doc(asBob(), 'inviteCodes', 'AB3K9P'), { name: 'Nope' }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(asAlice(), 'inviteCodes', 'AB3K9P'), { name: 'Renamed' }),
+    );
+    await assertSucceeds(deleteDoc(doc(asAlice(), 'inviteCodes', 'AB3K9P')));
+  });
+
+  it('gets no extra sight of anybody’s own data for being admin', async () => {
+    // The whole point of replacing the coach role: an admin looks after the
+    // group, and sees exactly what every other member sees.
+    await assertFails(getDoc(doc(asAlice(), 'users', BOB)));
+    await assertFails(getDoc(doc(asAlice(), 'users', BOB, 'days', '2026-03-04')));
+    await assertFails(getDocs(query(collection(asAlice(), 'users', BOB, 'photos'))));
   });
 });
 
@@ -337,17 +428,27 @@ describe('membership', () => {
     );
   });
 
-  it('stops a member changing another member share settings', async () => {
+  it('stops a plain member changing another member share settings', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'groups', GROUP, 'members', CAROL), {
+        uid: CAROL, displayName: 'Carol', role: 'member', shareFlags: {},
+      });
+    });
     await assertFails(
-      setDoc(doc(asAlice(), 'groups', GROUP, 'members', BOB), {
+      setDoc(doc(asCarol(), 'groups', GROUP, 'members', BOB), {
         uid: BOB, displayName: 'Bob', role: 'member', shareFlags: { photos: true },
       }),
     );
   });
 
-  it('lets a member remove only themselves', async () => {
-    await assertFails(deleteDoc(doc(asAlice(), 'groups', GROUP, 'members', BOB)));
-    await assertSucceeds(deleteDoc(doc(asBob(), 'groups', GROUP, 'members', BOB)));
+  it('lets a plain member remove only themselves', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'groups', GROUP, 'members', CAROL), {
+        uid: CAROL, displayName: 'Carol', role: 'member', shareFlags: {},
+      });
+    });
+    await assertFails(deleteDoc(doc(asCarol(), 'groups', GROUP, 'members', BOB)));
+    await assertSucceeds(deleteDoc(doc(asCarol(), 'groups', GROUP, 'members', CAROL)));
   });
 });
 
@@ -373,46 +474,369 @@ describe('invite codes', () => {
   });
 });
 
-describe('coach notes', () => {
-  it('lets the coach write a note', async () => {
+describe('the feed', () => {
+  it('lets a member read the feed', async () => {
+    await assertSucceeds(getDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1')));
+    await assertSucceeds(getDocs(query(collection(asAlice(), 'groups', GROUP, 'posts'))));
+  });
+
+  it('stops an outsider reading a single post or the whole feed', async () => {
+    await assertFails(getDoc(doc(asCarol(), 'groups', GROUP, 'posts', 'p1')));
+    await assertFails(getDocs(query(collection(asCarol(), 'groups', GROUP, 'posts'))));
+    await assertFails(getDocs(query(collection(asAnon(), 'groups', GROUP, 'posts'))));
+  });
+
+  it('lets a member post in their own name', async () => {
     await assertSucceeds(
-      setDoc(doc(asAlice(), 'groups', GROUP, 'notes', 'n1'), {
-        coachUid: ALICE, memberUid: BOB, text: 'Good week',
+      setDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p2'), {
+        authorUid: BOB, authorName: 'Bob', kind: 'note', body: 'Hello',
+        createdAt: new Date(),
       }),
     );
   });
 
-  it('stops a plain member writing a note', async () => {
+  it('stops a member posting in somebody else’s name', async () => {
     await assertFails(
-      setDoc(doc(asBob(), 'groups', GROUP, 'notes', 'n2'), {
-        coachUid: BOB, memberUid: ALICE, text: 'Nope',
+      setDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p3'), {
+        authorUid: ALICE, authorName: 'Alice', kind: 'note', body: 'Forged',
+        createdAt: new Date(),
       }),
     );
   });
 
-  it('stops a note being attributed to another coach', async () => {
+  it('stops an outsider posting at all', async () => {
     await assertFails(
-      setDoc(doc(asAlice(), 'groups', GROUP, 'notes', 'n3'), {
-        coachUid: BOB, memberUid: BOB, text: 'Forged',
+      setDoc(doc(asCarol(), 'groups', GROUP, 'posts', 'p4'), {
+        authorUid: CAROL, authorName: 'Carol', kind: 'note', createdAt: new Date(),
       }),
     );
   });
 
-  it('lets the member a note is about read it', async () => {
+  it('lets an author delete their own post', async () => {
+    await assertSucceeds(deleteDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p1')));
+  });
+
+  it('lets the admin delete anybody’s post', async () => {
+    await assertSucceeds(deleteDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1')));
+  });
+
+  it('stops a plain member deleting somebody else’s post', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
-      await setDoc(doc(context.firestore(), 'groups', GROUP, 'notes', 'n4'), {
-        coachUid: ALICE, memberUid: BOB, text: 'For Bob',
+      const db = context.firestore();
+      await setDoc(doc(db, 'groups', GROUP, 'members', CAROL), {
+        uid: CAROL, displayName: 'Carol', role: 'member', shareFlags: {},
       });
     });
-    await assertSucceeds(getDoc(doc(asBob(), 'groups', GROUP, 'notes', 'n4')));
+    // Carol is a member now, but not the author and not the admin.
+    await assertFails(deleteDoc(doc(asCarol(), 'groups', GROUP, 'posts', 'p1')));
   });
 
-  it('stops an outsider reading notes', async () => {
+  it('lets an author rewrite their own post', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p1'), { body: 'Edited' }),
+    );
+  });
+
+  it('stops an author wiping the reactions other people left', async () => {
+    await assertFails(
+      updateDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p1'), { reactions: {} }),
+    );
+  });
+
+  it('stops an author handing their post to somebody else', async () => {
+    await assertFails(
+      updateDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p1'), { authorUid: ALICE }),
+    );
+  });
+
+  it('stops a member rewriting somebody else’s post', async () => {
+    await assertFails(
+      updateDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1'), { body: 'Hijacked' }),
+    );
+  });
+});
+
+describe('reactions', () => {
+  it('lets a member add their own reaction to another member’s post', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1'), {
+        reactions: { [CAROL]: 'fire', [ALICE]: 'thumb' },
+      }),
+    );
+  });
+
+  it('lets a member take their own reaction off again', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
-      await setDoc(doc(context.firestore(), 'groups', GROUP, 'notes', 'n5'), {
-        coachUid: ALICE, memberUid: BOB, text: 'Private',
+      await setDoc(
+        doc(context.firestore(), 'groups', GROUP, 'posts', 'p1'),
+        { reactions: { [ALICE]: 'thumb' } },
+        { merge: true },
+      );
+    });
+    // Carol's stays; only Alice's own key may go.
+    await assertSucceeds(
+      updateDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1'), {
+        reactions: { [CAROL]: 'fire' },
+      }),
+    );
+  });
+
+  it('stops a member reacting on somebody else’s behalf', async () => {
+    await assertFails(
+      updateDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1'), {
+        reactions: { [CAROL]: 'fire', [BOB]: 'flex' },
+      }),
+    );
+  });
+
+  it('stops a member deleting somebody else’s reaction', async () => {
+    await assertFails(
+      updateDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1'), { reactions: {} }),
+    );
+  });
+
+  it('stops the reaction path being used to edit the post itself', async () => {
+    await assertFails(
+      updateDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1'), {
+        reactions: { [CAROL]: 'fire', [ALICE]: 'thumb' },
+        body: 'Rewritten',
+      }),
+    );
+  });
+
+  it('stops an outsider reacting', async () => {
+    await assertFails(
+      updateDoc(doc(asCarol(), 'groups', GROUP, 'posts', 'p1'), {
+        reactions: { [CAROL]: 'flex' },
+      }),
+    );
+  });
+});
+
+describe('comments', () => {
+  it('lets a member read and write comments in their own name', async () => {
+    await assertSucceeds(
+      getDocs(query(collection(asAlice(), 'groups', GROUP, 'posts', 'p1', 'comments'))),
+    );
+    await assertSucceeds(
+      setDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c2'), {
+        authorUid: ALICE, authorName: 'Alice', text: 'Well done', createdAt: new Date(),
+      }),
+    );
+  });
+
+  it('stops a member commenting in somebody else’s name', async () => {
+    await assertFails(
+      setDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c3'), {
+        authorUid: BOB, authorName: 'Bob', text: 'Forged', createdAt: new Date(),
+      }),
+    );
+  });
+
+  it('stops an outsider reading or writing comments', async () => {
+    await assertFails(
+      getDocs(query(collection(asCarol(), 'groups', GROUP, 'posts', 'p1', 'comments'))),
+    );
+    await assertFails(
+      setDoc(doc(asCarol(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c4'), {
+        authorUid: CAROL, authorName: 'Carol', text: 'Nope', createdAt: new Date(),
+      }),
+    );
+  });
+
+  it('lets the author delete their own comment', async () => {
+    await assertSucceeds(
+      deleteDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c1')),
+    );
+  });
+
+  it('lets the admin delete anybody’s comment', async () => {
+    await assertSucceeds(
+      deleteDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c1')),
+    );
+  });
+
+  it('stops a plain member deleting somebody else’s comment', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'groups', GROUP, 'members', CAROL), {
+        uid: CAROL, displayName: 'Carol', role: 'member', shareFlags: {},
       });
     });
-    await assertFails(getDoc(doc(asCarol(), 'groups', GROUP, 'notes', 'n5')));
+    await assertFails(
+      deleteDoc(doc(asCarol(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c1')),
+    );
+  });
+
+  it('stops anybody editing a comment after the fact', async () => {
+    await assertFails(
+      updateDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c1'), {
+        text: 'Changed',
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(asAlice(), 'groups', GROUP, 'posts', 'p1', 'comments', 'c1'), {
+        text: 'Changed',
+      }),
+    );
+  });
+});
+
+describe('nudges', () => {
+  const nudge = (from: string, to: string) => ({
+    groupId: GROUP,
+    groupName: 'Test group',
+    fromUid: from,
+    fromName: from,
+    toUid: to,
+    day: '2026-11-09',
+    seen: false,
+    createdAt: new Date(),
+  });
+
+  it('lets one member nudge another', async () => {
+    await assertSucceeds(
+      setDoc(doc(asAlice(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        nudge(ALICE, BOB)),
+    );
+  });
+
+  it('stops a nudge being sent in somebody else’s name', async () => {
+    await assertFails(
+      setDoc(doc(asAlice(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        nudge(BOB, BOB)),
+    );
+  });
+
+  it('stops anybody nudging themselves', async () => {
+    await assertFails(
+      setDoc(doc(asAlice(), 'groups', GROUP, 'nudges', `${ALICE}_2026-11-09`),
+        nudge(ALICE, ALICE)),
+    );
+  });
+
+  it('stops an outsider nudging into the group', async () => {
+    await assertFails(
+      setDoc(doc(asCarol(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        nudge(CAROL, BOB)),
+    );
+  });
+
+  it('stops a nudge arriving pre-read', async () => {
+    await assertFails(
+      setDoc(doc(asAlice(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        { ...nudge(ALICE, BOB), seen: true }),
+    );
+  });
+
+  it('allows only one per person per day, enforced by the database', async () => {
+    await assertSucceeds(
+      setDoc(doc(asAlice(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        nudge(ALICE, BOB)),
+    );
+    // The second is an update of a document that exists, and nothing grants
+    // that to the sender — not even to a different sender.
+    await assertFails(
+      setDoc(doc(asAlice(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        nudge(ALICE, BOB)),
+    );
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'groups', GROUP, 'members', CAROL), {
+        uid: CAROL, displayName: 'Carol', role: 'member', shareFlags: {},
+      });
+    });
+    await assertFails(
+      setDoc(doc(asCarol(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        nudge(CAROL, BOB)),
+    );
+  });
+
+  it('lets the person nudged mark it read, and nobody else', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        nudge(ALICE, BOB),
+      );
+    });
+    await assertFails(
+      updateDoc(doc(asAlice(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        { seen: true }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(asBob(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        { seen: true }),
+    );
+  });
+
+  it('stops the recipient rewriting anything but the seen flag', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        nudge(ALICE, BOB),
+      );
+    });
+    await assertFails(
+      updateDoc(doc(asBob(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        { seen: true, fromName: 'Someone else' }),
+    );
+  });
+
+  it('lets a user find the nudges addressed to them, wherever they are', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'groups', GROUP, 'nudges', `${BOB}_2026-11-09`),
+        nudge(ALICE, BOB),
+      );
+    });
+    await assertSucceeds(
+      getDocs(query(
+        collectionGroup(asBob(), 'nudges'),
+        where('toUid', '==', BOB),
+        where('seen', '==', false),
+      )),
+    );
+  });
+
+  it('stops that same query being pointed at somebody else', async () => {
+    await assertFails(
+      getDocs(query(
+        collectionGroup(asAlice(), 'nudges'),
+        where('toUid', '==', BOB),
+        where('seen', '==', false),
+      )),
+    );
+    // And an unfiltered sweep of every nudge in the database is refused too.
+    await assertFails(getDocs(query(collectionGroup(asBob(), 'nudges'))));
+  });
+});
+
+describe('leaving a group', () => {
+  it('ends access to the feed the moment the member record goes', async () => {
+    await assertSucceeds(getDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p1')));
+    await assertSucceeds(deleteDoc(doc(asBob(), 'groups', GROUP, 'members', BOB)));
+
+    await assertFails(getDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p1')));
+    await assertFails(getDoc(doc(asBob(), 'groups', GROUP)));
+    await assertFails(
+      getDocs(query(collection(asBob(), 'groups', GROUP, 'posts', 'p1', 'comments'))),
+    );
+  });
+
+  it('lets a member clear their own posts on the way out', async () => {
+    // Which is how "leaving removes your posts" is carried out: the member
+    // deletes them while they still have permission to.
+    await assertSucceeds(
+      getDocs(query(
+        collection(asBob(), 'groups', GROUP, 'posts'),
+        where('authorUid', '==', BOB),
+      )),
+    );
+    await assertSucceeds(deleteDoc(doc(asBob(), 'groups', GROUP, 'posts', 'p1')));
+  });
+
+  it('stops a removed member reading anything they used to', async () => {
+    await assertSucceeds(deleteDoc(doc(asAlice(), 'groups', GROUP, 'members', BOB)));
+    await assertFails(
+      getDoc(doc(asBob(), 'groups', GROUP, 'members', ALICE, 'shared', 'summary')),
+    );
   });
 });

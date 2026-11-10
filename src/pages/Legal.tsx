@@ -64,8 +64,21 @@ export function Privacy() {
           as a number on the scale. Untick a box and that section is removed immediately.
         </p>
         <p>
-          A coach in a group you join can see the same shared summary as other members,
-          plus any notes they write about you. A coach cannot see your raw logs.
+          Posts you write, and the automatic posts the app writes for a category you
+          turned on, appear only in the groups you shared them with. Leaving a group,
+          being removed from it, or unticking a category deletes those posts from that
+          group&rsquo;s feed.
+        </p>
+        <p>
+          Each group has one admin — whoever created it, or whoever it was handed to.
+          An admin can invite people, remove them, delete any post or comment, and
+          rename or delete the group. An admin has no extra sight of your data
+          whatsoever: they see exactly the same summary every other member sees.
+        </p>
+        <p>
+          If you leave &ldquo;show when I&rsquo;m inactive&rdquo; on, your groups can see
+          that you have not logged for a few days and send you a nudge. That shares no
+          data about you, only the gap, and you can turn it off per group.
         </p>
         <p className="text-ink-soft">
           One honest caveat about photos: shared photo thumbnails are published as links

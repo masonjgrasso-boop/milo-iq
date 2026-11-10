@@ -6,17 +6,29 @@
 // rule is a simple membership check and there is no way for a filtering bug
 // to leak data that was never there.
 
+import { blendedTarget } from './goals';
 import { currentStreak, weekSummary, weeklyLimitStatus, weeklyLimitStreak } from './rules';
 import { summarizeDays } from './summaries';
 import { firstTrend, latestTrend, trendSeries } from './trend';
-import { startOfWeek, type DayKey, type WeekKey } from './dates';
-import type { DayLog, Exercise, Rule, UnitSystem } from './types';
+import { daysBetween, startOfWeek, type DayKey, type WeekKey } from './dates';
+import type { DayLog, Exercise, GoalPeriod, Rule, UnitSystem } from './types';
 
-export type ShareKey = 'calories' | 'weight' | 'workouts' | 'rules' | 'photos';
+export type ShareKey =
+  | 'calories' | 'weight' | 'workouts' | 'rules' | 'photos' | 'activity';
 export type ShareFlags = Record<ShareKey, boolean>;
-export type GroupRole = 'coach' | 'member';
 
-export const SHARE_KEYS: ShareKey[] = ['calories', 'weight', 'workouts', 'rules', 'photos'];
+/**
+ * One admin per group, everyone else a member.
+ *
+ * This replaces the old coach/client split. A coach was a role the app gave
+ * special sight of other people's data; an admin is only a caretaker of the
+ * group itself, and sees exactly what every other member sees.
+ */
+export type GroupRole = 'admin' | 'member';
+
+export const SHARE_KEYS: ShareKey[] = [
+  'calories', 'weight', 'workouts', 'rules', 'photos', 'activity',
+];
 
 export const SHARE_LABELS: Record<ShareKey, string> = {
   calories: 'Calories',
@@ -24,6 +36,7 @@ export const SHARE_LABELS: Record<ShareKey, string> = {
   workouts: 'Workouts',
   rules: 'Rules and streaks',
   photos: 'Progress photos',
+  activity: 'Show when I am inactive',
 };
 
 export const SHARE_DESCRIPTIONS: Record<ShareKey, string> = {
@@ -32,6 +45,7 @@ export const SHARE_DESCRIPTIONS: Record<ShareKey, string> = {
   workouts: 'Sessions this week and your best lifts',
   rules: 'Your rules and how your streaks are going',
   photos: 'Thumbnails of your weekly photos',
+  activity: 'Lets the group see a gap in your logging, and nudge you',
 };
 
 /** Nothing is shared until the member says so. */
@@ -41,7 +55,32 @@ export const NO_SHARING: ShareFlags = {
   workouts: false,
   rules: false,
   photos: false,
+  activity: false,
 };
+
+/**
+ * What a new member starts with.
+ *
+ * Everything substantive is off, as it always has been. The exception is the
+ * inactivity flag, which is on: it shares no data at all, only the fact that
+ * a gap exists, and a group whose members cannot see a gap cannot do the one
+ * thing an accountability group is for. It is a single tap to turn off, and
+ * the sharing screen says what it does.
+ */
+export const DEFAULT_SHARING: ShareFlags = { ...NO_SHARING, activity: true };
+
+/** A member who has not logged for this long shows as inactive to the group. */
+export const INACTIVE_AFTER_DAYS = 3;
+
+/** Whether a member's last logged day is far enough back to mention. */
+export function daysInactive(lastLoggedDay: DayKey | undefined, today: DayKey): number {
+  if (!lastLoggedDay) return 0;
+  return Math.max(0, daysBetween(lastLoggedDay, today));
+}
+
+export function isInactive(lastLoggedDay: DayKey | undefined, today: DayKey): boolean {
+  return daysInactive(lastLoggedDay, today) >= INACTIVE_AFTER_DAYS;
+}
 
 // Characters that cannot be confused for one another when read aloud or
 // typed: no O/0, no I/1.
@@ -70,8 +109,18 @@ export function isValidInviteCode(input: string): boolean {
 
 export interface SharedCalories {
   avgIntake: number;
+  /** The target in force today, which is the one worth showing. */
   target: number;
   daysLogged: number;
+  /**
+   * Positive means under target across the logged days.
+   *
+   * Measured against the target that was actually in force on each of those
+   * days, not against today's. A week in which the member switched from
+   * losing to gaining is scored partly against each, exactly as Trends does
+   * it, so a group never sees someone's old deficit days counted as a failure
+   * to gain.
+   */
   deficit: number;
 }
 
@@ -105,6 +154,8 @@ export interface SharedPhoto {
 export interface SharedSummary {
   uid: string;
   displayName: string;
+  /** The last day anything was logged, shared only with the activity flag. */
+  lastLoggedDay?: DayKey;
   updatedAt?: unknown;
   calories?: SharedCalories;
   weight?: SharedWeight;
@@ -120,6 +171,12 @@ export interface ShareInput {
   days: DayLog[];
   today: DayKey;
   targetCalories: number;
+  /**
+   * Every goal the member has held, so a week spanning a change scores right.
+   * Optional because the profile field is: somebody who has never changed
+   * goals has no history, and one target applies to the whole week.
+   */
+  goalHistory?: GoalPeriod[];
   units: UnitSystem;
   rules: Rule[];
   exercises: Exercise[];
@@ -130,7 +187,7 @@ export interface ShareInput {
  * Assembles the mirror document.
  *
  * Weight is deliberately shared as a change rather than an absolute number:
- * what a group or coach needs is the direction of travel, and sharing the
+ * what a group needs is the direction of travel, and sharing the
  * figure on the scale is a far bigger ask than most people realise.
  */
 export function buildSharedSummary(input: ShareInput): SharedSummary {
@@ -139,14 +196,24 @@ export function buildSharedSummary(input: ShareInput): SharedSummary {
   const thisWeek = input.days.filter((day) => day.date >= weekStart && day.date <= input.today);
 
   if (input.flags.calories) {
+    // Blended across any goal change inside the week, so each logged day is
+    // judged against the goal that was active on it. Only the logged days
+    // count towards the blend, because only they are scored.
+    const target = blendedTarget(
+      thisWeek.filter((day) => day.calories > 0).map((day) => day.date),
+      input.goalHistory ?? [],
+      input.targetCalories,
+    );
     const week = summarizeDays(thisWeek, {
       key: 'week',
       start: weekStart,
       end: input.today,
-      targetCalories: input.targetCalories,
+      targetCalories: target,
     });
     summary.calories = {
       avgIntake: week.avgCalories,
+      // The figure on screen is today's target; the deficit above is what the
+      // week was really measured against.
       target: input.targetCalories,
       daysLogged: week.daysLogged,
       deficit: week.deficit,
@@ -213,6 +280,13 @@ export function buildSharedSummary(input: ShareInput): SharedSummary {
 
   if (input.flags.photos) {
     summary.photos = input.photos.slice(0, 8);
+  }
+
+  if (input.flags.activity) {
+    // A date, not a count: the group reads it against its own clock, so a
+    // member who stops opening the app still shows the gap growing.
+    const logged = input.days.filter((day) => day.calories > 0).map((day) => day.date).sort();
+    if (logged.length > 0) summary.lastLoggedDay = logged[logged.length - 1];
   }
 
   return summary;

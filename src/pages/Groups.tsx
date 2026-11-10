@@ -14,7 +14,6 @@ export function Groups() {
   const [groups, setGroups] = useState<Membership[] | null>(null);
   const [mode, setMode] = useState<Mode>('none');
   const [name, setName] = useState('');
-  const [asCoach, setAsCoach] = useState(false);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,10 +27,12 @@ export function Groups() {
     setBusy(true);
     setError(null);
     try {
-      const group = await createGroup(user.uid, displayNameFor(user), name.trim(), asCoach);
+      const group = await createGroup(
+        user.uid, displayNameFor(user), name.trim(), user.photoURL ?? undefined,
+      );
       setGroups((current) => [
         ...(current ?? []),
-        { groupId: group.id, name: group.name, role: asCoach ? 'coach' : 'member' },
+        { groupId: group.id, name: group.name, role: 'admin' },
       ]);
       setName('');
       setMode('none');
@@ -47,7 +48,9 @@ export function Groups() {
     setBusy(true);
     setError(null);
     try {
-      const group = await joinGroup(user.uid, displayNameFor(user), code);
+      const group = await joinGroup(
+        user.uid, displayNameFor(user), code, user.photoURL ?? undefined,
+      );
       setGroups((current) => {
         const already = (current ?? []).some((item) => item.groupId === group.id);
         return already
@@ -100,8 +103,8 @@ export function Groups() {
                 <span className="block truncate font-medium text-ink">
                   {membership.name}
                 </span>
-                {membership.role === 'coach' && (
-                  <span className="block text-xs font-medium text-brand">Coach</span>
+                {membership.role === 'admin' && (
+                  <span className="block text-xs font-medium text-brand">Admin</span>
                 )}
               </span>
               <span aria-hidden="true" className="shrink-0 text-ink-ghost">
@@ -128,20 +131,10 @@ export function Groups() {
                 placeholder="Thursday lifting crew"
               />
             </Field>
-            <label className="flex items-start gap-2.5 text-sm text-ink-soft">
-              <input
-                type="checkbox"
-                checked={asCoach}
-                onChange={(event) => setAsCoach(event.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-line-in accent-brand"
-              />
-              <span>
-                I am coaching this group
-                <span className="block text-xs text-ink-mute">
-                  Coaches can leave notes on each member&rsquo;s shared data.
-                </span>
-              </span>
-            </label>
+            <p className="text-xs text-ink-mute">
+              You will be its admin: you can invite people, remove them, and rename or
+              delete the group. You see exactly what every other member sees.
+            </p>
             <div className="flex gap-3">
               <Button variant="secondary" onClick={() => setMode('none')}>
                 Cancel

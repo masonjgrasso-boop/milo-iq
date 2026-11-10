@@ -1,23 +1,32 @@
 // Groups, membership, and the per-member mirror documents.
 //
-//   groups/{gid}                                   name, coach, invite code
+//   groups/{gid}                                   name, admin, invite code
 //   groups/{gid}/members/{uid}                     role and share settings
 //   groups/{gid}/members/{uid}/shared/summary      only what that member shares
-//   groups/{gid}/notes/{noteId}                    coach notes about a member
+//   groups/{gid}/posts/{postId}                    the feed (see ./posts)
 //   inviteCodes/{CODE}                             code -> group lookup
 //   users/{uid}/groups/{gid}                       so a user can list their groups
 //
 // The invite-code lookup is its own tiny collection. Finding a group by code
 // otherwise means querying the whole groups collection, which would require
 // letting any signed-in user list every group that exists.
+//
+// A group has one admin and everyone else is a member. Nobody, admin
+// included, can write into another user's own data, which is why a few
+// housekeeping jobs heal themselves instead: renaming a group, removing a
+// member and deleting a group all leave the other person's pointer at
+// users/{uid}/groups/{gid} momentarily stale, and their own client tidies it
+// the next time they look. The alternative would be a rule letting one user
+// write inside another's documents, which is not a trade worth making for a
+// stale group name.
 
 import {
-  addDoc, collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query,
+  collection, deleteDoc, doc, getDoc, getDocs, orderBy, query,
   serverTimestamp, setDoc, updateDoc, writeBatch,
 } from 'firebase/firestore';
 import { getDb } from '../lib/firebase';
 import {
-  generateInviteCode, normalizeInviteCode, NO_SHARING,
+  generateInviteCode, normalizeInviteCode, DEFAULT_SHARING,
   type GroupRole, type ShareFlags, type SharedSummary,
 } from '../lib/groups';
 
@@ -25,7 +34,8 @@ export interface Group {
   id: string;
   name: string;
   inviteCode: string;
-  coachUid: string | null;
+  /** The one person who can invite, remove, rename and delete. */
+  adminUid: string;
   createdBy: string;
   createdAt?: unknown;
 }
@@ -33,6 +43,7 @@ export interface Group {
 export interface GroupMember {
   uid: string;
   displayName: string;
+  photoURL?: string;
   role: GroupRole;
   shareFlags: ShareFlags;
   joinedAt?: unknown;
@@ -42,26 +53,28 @@ export interface Membership {
   groupId: string;
   name: string;
   role: GroupRole;
+  /**
+   * A copy of the member's own flags.
+   *
+   * Denormalised so that the code which writes automatic posts can tell, from
+   * the one list it already reads, which groups should hear about a finished
+   * workout. Without it every post would cost a read of every group's member
+   * document first.
+   */
+  shareFlags?: ShareFlags;
   joinedAt?: unknown;
 }
 
-export interface CoachNote {
-  id: string;
-  memberUid: string;
-  coachUid: string;
-  text: string;
-  createdAt?: unknown;
-}
-
 const groupsCollection = () => collection(getDb(), 'groups');
-const groupRef = (groupId: string) => doc(groupsCollection(), groupId);
+export const groupRef = (groupId: string) => doc(groupsCollection(), groupId);
 const membersCollection = (groupId: string) => collection(groupRef(groupId), 'members');
 const memberRef = (groupId: string, uid: string) => doc(membersCollection(groupId), uid);
 const sharedRef = (groupId: string, uid: string) =>
   doc(collection(memberRef(groupId, uid), 'shared'), 'summary');
-const notesCollection = (groupId: string) => collection(groupRef(groupId), 'notes');
 const inviteRef = (code: string) => doc(collection(getDb(), 'inviteCodes'), code);
 const membershipsCollection = (uid: string) => collection(getDb(), 'users', uid, 'groups');
+const membershipRef = (uid: string, groupId: string) =>
+  doc(membershipsCollection(uid), groupId);
 
 export async function listMyGroups(uid: string): Promise<Membership[]> {
   const snap = await getDocs(query(membershipsCollection(uid), orderBy('joinedAt')));
@@ -78,29 +91,23 @@ export async function listMembers(groupId: string): Promise<GroupMember[]> {
   return snap.docs.map((document) => document.data() as GroupMember);
 }
 
-/** Creates a group and makes the creator its first member. */
+/** Creates a group. Whoever makes it is its admin. */
 export async function createGroup(
   uid: string,
   displayName: string,
   name: string,
-  asCoach: boolean,
+  photoURL?: string,
 ): Promise<Group> {
   const ref = doc(groupsCollection());
   const inviteCode = generateInviteCode();
 
-  const group: Group = {
-    id: ref.id,
-    name,
-    inviteCode,
-    coachUid: asCoach ? uid : null,
-    createdBy: uid,
-  };
-
+  const group: Group = { id: ref.id, name, inviteCode, adminUid: uid, createdBy: uid };
   const member: GroupMember = {
     uid,
     displayName,
-    role: asCoach ? 'coach' : 'member',
-    shareFlags: { ...NO_SHARING },
+    ...(photoURL ? { photoURL } : {}),
+    role: 'admin',
+    shareFlags: { ...DEFAULT_SHARING },
   };
 
   const batch = writeBatch(getDb());
@@ -114,10 +121,11 @@ export async function createGroup(
     createdBy: uid,
     createdAt: serverTimestamp(),
   });
-  batch.set(doc(membershipsCollection(uid), ref.id), {
+  batch.set(membershipRef(uid, ref.id), {
     groupId: ref.id,
     name,
     role: member.role,
+    shareFlags: member.shareFlags,
     joinedAt: serverTimestamp(),
   });
   await batch.commit();
@@ -132,6 +140,7 @@ export async function joinGroup(
   uid: string,
   displayName: string,
   rawCode: string,
+  photoURL?: string,
 ): Promise<Group> {
   const code = normalizeInviteCode(rawCode);
   const invite = await getDoc(inviteRef(code));
@@ -146,14 +155,16 @@ export async function joinGroup(
   batch.set(memberRef(groupId, uid), {
     uid,
     displayName,
+    ...(photoURL ? { photoURL } : {}),
     role: 'member',
-    shareFlags: { ...NO_SHARING },
+    shareFlags: { ...DEFAULT_SHARING },
     joinedAt: serverTimestamp(),
   });
-  batch.set(doc(membershipsCollection(uid), groupId), {
+  batch.set(membershipRef(uid, groupId), {
     groupId,
     name,
     role: 'member',
+    shareFlags: { ...DEFAULT_SHARING },
     joinedAt: serverTimestamp(),
   });
   await batch.commit();
@@ -167,14 +178,97 @@ export async function joinGroup(
  * Leaves a group, removing the member document, the mirror and the pointer.
  *
  * Deleting the member document is what removes access: the security rules
- * check for it on every read, so access ends immediately.
+ * check for it on every read, so access ends immediately. The caller clears
+ * the member's posts first, while they still have permission to.
  */
 export async function leaveGroup(uid: string, groupId: string): Promise<void> {
   const batch = writeBatch(getDb());
   batch.delete(sharedRef(groupId, uid));
   batch.delete(memberRef(groupId, uid));
-  batch.delete(doc(membershipsCollection(uid), groupId));
+  batch.delete(membershipRef(uid, groupId));
   await batch.commit();
+}
+
+/**
+ * Removes somebody else. Admin only, and enforced in the rules rather than
+ * here.
+ *
+ * Their pointer under their own user document cannot be touched from here, so
+ * it is left for their client to tidy when it next finds the group gone.
+ */
+export async function removeMember(groupId: string, uid: string): Promise<void> {
+  const batch = writeBatch(getDb());
+  batch.delete(sharedRef(groupId, uid));
+  batch.delete(memberRef(groupId, uid));
+  await batch.commit();
+}
+
+/**
+ * Hands the group to someone else.
+ *
+ * The admin writes both role changes and the group document in one batch, so
+ * there is never a moment with two admins or none.
+ */
+export async function transferAdmin(
+  groupId: string,
+  fromUid: string,
+  toUid: string,
+): Promise<void> {
+  const batch = writeBatch(getDb());
+  batch.update(groupRef(groupId), { adminUid: toUid });
+  batch.update(memberRef(groupId, toUid), { role: 'admin' });
+  batch.update(memberRef(groupId, fromUid), { role: 'member' });
+  await batch.commit();
+}
+
+/** Renames the group, and the invite that carries the name for joiners. */
+export async function renameGroup(
+  groupId: string,
+  adminUid: string,
+  inviteCode: string,
+  name: string,
+): Promise<void> {
+  const batch = writeBatch(getDb());
+  batch.update(groupRef(groupId), { name });
+  batch.update(inviteRef(inviteCode), { name });
+  batch.update(membershipRef(adminUid, groupId), { name });
+  await batch.commit();
+}
+
+/**
+ * Deletes the group itself.
+ *
+ * The admin can reach the group document, the invite, every member record and
+ * every post, so all of those go. What is left behind is each other member's
+ * own pointer, which only they can delete; their client does that the next
+ * time it finds the group missing.
+ */
+export async function deleteGroup(group: Group, adminUid: string): Promise<void> {
+  const members = await listMembers(group.id);
+
+  const batch = writeBatch(getDb());
+  for (const member of members) {
+    batch.delete(sharedRef(group.id, member.uid));
+    batch.delete(memberRef(group.id, member.uid));
+  }
+  batch.delete(inviteRef(group.inviteCode));
+  batch.delete(groupRef(group.id));
+  batch.delete(membershipRef(adminUid, group.id));
+  await batch.commit();
+}
+
+/** Drops a pointer to a group that has gone, or that we were removed from. */
+export async function forgetGroup(uid: string, groupId: string): Promise<void> {
+  await deleteDoc(membershipRef(uid, groupId));
+}
+
+/** Keeps a member's own pointer in step with a name the admin changed. */
+export async function syncMembershipName(
+  uid: string,
+  groupId: string,
+  name: string,
+): Promise<void> {
+  await updateDoc(membershipRef(uid, groupId), { name });
 }
 
 export async function updateShareFlags(
@@ -182,7 +276,11 @@ export async function updateShareFlags(
   groupId: string,
   shareFlags: ShareFlags,
 ): Promise<void> {
-  await updateDoc(memberRef(groupId, uid), { shareFlags });
+  const batch = writeBatch(getDb());
+  batch.update(memberRef(groupId, uid), { shareFlags });
+  // The copy on the pointer is what the automatic posts read.
+  batch.update(membershipRef(uid, groupId), { shareFlags });
+  await batch.commit();
 }
 
 /** Writes the mirror document: only the sections the member shares. */
@@ -202,29 +300,4 @@ export async function getSharedSummary(
 ): Promise<SharedSummary | null> {
   const snap = await getDoc(sharedRef(groupId, uid));
   return snap.exists() ? (snap.data() as SharedSummary) : null;
-}
-
-export async function addNote(
-  groupId: string,
-  coachUid: string,
-  memberUid: string,
-  text: string,
-): Promise<void> {
-  await addDoc(notesCollection(groupId), {
-    coachUid,
-    memberUid,
-    text,
-    createdAt: serverTimestamp(),
-  });
-}
-
-export async function listNotes(groupId: string, max = 50): Promise<CoachNote[]> {
-  const snap = await getDocs(
-    query(notesCollection(groupId), orderBy('createdAt', 'desc'), limit(max)),
-  );
-  return snap.docs.map((document) => ({ ...(document.data() as CoachNote), id: document.id }));
-}
-
-export async function deleteNote(groupId: string, noteId: string): Promise<void> {
-  await deleteDoc(doc(notesCollection(groupId), noteId));
 }

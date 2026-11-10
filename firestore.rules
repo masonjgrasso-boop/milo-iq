@@ -4,10 +4,15 @@ rules_version = '2';
 //
 // Two principles:
 //   1. A user's own data is reachable only by that user.
-//   2. A group member can read only the "mirror" documents other members
-//      publish. Those contain nothing but what each member chose to share, so
-//      unshared data is not merely filtered out — it was never written
-//      anywhere the group can read.
+//   2. A group member can read only the "mirror" documents and the posts
+//      other members publish. Those contain nothing but what each member
+//      chose to share, so unshared data is not merely filtered out — it was
+//      never written anywhere the group can read.
+//
+// A group has one admin and everyone else is a member. The admin looks after
+// the group — invites, removals, renaming, deleting, and taking down a post
+// or a comment — and gets no extra sight of anybody's data whatsoever. There
+// is deliberately no role that can read more than its owner shared.
 //
 // Everything not matched below is denied.
 
@@ -28,10 +33,10 @@ service cloud.firestore {
       );
     }
 
-    function isCoach(groupId) {
+    function isAdmin(groupId) {
       return signedIn() && get(
         /databases/$(database)/documents/groups/$(groupId)
-      ).data.coachUid == request.auth.uid;
+      ).data.adminUid == request.auth.uid;
     }
 
     // ---- A user's own data -------------------------------------------------
@@ -74,6 +79,13 @@ service cloud.firestore {
           allow read, write: if isOwner(uid);
         }
       }
+
+      // The pointers that let a user list their own groups. Nobody else may
+      // write here, which is exactly why removing a member or renaming a
+      // group leaves the other person's pointer for their own client to tidy.
+      match /groups/{groupId} {
+        allow read, write: if isOwner(uid);
+      }
     }
 
     // ---- Invite codes ------------------------------------------------------
@@ -88,7 +100,10 @@ service cloud.firestore {
       allow list: if false;
       allow create: if signedIn()
         && request.resource.data.createdBy == request.auth.uid;
-      allow update, delete: if false;
+      // Renaming a group renames its invite, and deleting one deletes it.
+      // Both are the admin's to do, and the group id stored here is what ties
+      // this code to the group whose admin is being checked.
+      allow update, delete: if isAdmin(resource.data.groupId);
     }
 
     // ---- Groups ------------------------------------------------------------
@@ -97,41 +112,111 @@ service cloud.firestore {
       // Members only, and never listable: no browsing other people's groups.
       allow get: if isMember(groupId);
       allow list: if false;
+      // Whoever creates a group is its admin. Creating one that names someone
+      // else as admin is refused, so a group can never arrive pre-captured.
       allow create: if signedIn()
-        && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isCoach(groupId);
-      allow delete: if false;
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.adminUid == request.auth.uid;
+      allow update: if isAdmin(groupId);
+      allow delete: if isAdmin(groupId);
 
-      // Membership. Each person writes only their own record, so nobody can
-      // add someone else to a group or alter another member's settings.
-      // Deleting your own record is how leaving works, and because every read
-      // rule below checks for that record, access ends the moment it is gone.
+      // Membership. A member writes their own record and may never change
+      // their own role, so nobody can promote themselves. The admin may
+      // change a role, which is how the group is handed on, and may remove
+      // anyone. Deleting your own record is how leaving works, and because
+      // every read rule below checks for that record, access ends the moment
+      // it is gone.
       match /members/{uid} {
         allow read: if isMember(groupId);
         allow create: if isOwner(uid)
           && request.resource.data.uid == uid;
-        allow update: if isOwner(uid)
-          && request.resource.data.role == resource.data.role;
-        allow delete: if isOwner(uid);
+        allow update: if (isOwner(uid)
+            && request.resource.data.role == resource.data.role)
+          || isAdmin(groupId);
+        allow delete: if isOwner(uid) || isAdmin(groupId);
 
-        // The mirror: readable by the group, writable only by its owner.
+        // The mirror: readable by the group, writable only by its owner. The
+        // admin may delete it, because removing somebody has to take the data
+        // they shared with it.
         match /shared/{document} {
           allow read: if isMember(groupId);
           allow write: if isOwner(uid);
+          allow delete: if isOwner(uid) || isAdmin(groupId);
         }
       }
 
-      // Coach notes. Written by the coach, readable by the coach and by the
-      // member the note is about.
-      match /notes/{noteId} {
-        allow get: if isCoach(groupId)
-          || (signedIn() && resource.data.memberUid == request.auth.uid);
-        allow list: if isCoach(groupId);
-        allow create: if isCoach(groupId)
-          && request.resource.data.coachUid == request.auth.uid;
-        allow update: if false;
-        allow delete: if isCoach(groupId);
+      // ---- The feed --------------------------------------------------------
+
+      match /posts/{postId} {
+        // A member may change their own reaction, and only their own key in
+        // the map. Everything else about the post must stay as it was.
+        function currentReactions() {
+          return resource.data.get('reactions', {});
+        }
+        function nextReactions() {
+          return request.resource.data.get('reactions', {});
+        }
+        function onlyMyReaction() {
+          return request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['reactions'])
+            && nextReactions().diff(currentReactions()).affectedKeys()
+              .hasOnly([request.auth.uid]);
+        }
+        // An author rewriting their own automatic post must not be able to
+        // reach the reactions other people left on it, nor hand the post to
+        // somebody else.
+        function authorEdit() {
+          return resource.data.authorUid == request.auth.uid
+            && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['reactions', 'authorUid']);
+        }
+
+        allow read: if isMember(groupId);
+        allow create: if isMember(groupId)
+          && request.resource.data.authorUid == request.auth.uid;
+        allow update: if isMember(groupId) && (authorEdit() || onlyMyReaction());
+        // Your own, or anything at all if you are the admin.
+        allow delete: if isMember(groupId)
+          && (resource.data.authorUid == request.auth.uid || isAdmin(groupId));
+
+        match /comments/{commentId} {
+          allow read: if isMember(groupId);
+          allow create: if isMember(groupId)
+            && request.resource.data.authorUid == request.auth.uid;
+          // A comment is not editable. Changing what you said after somebody
+          // has replied to it is not a feature this app needs.
+          allow update: if false;
+          allow delete: if isMember(groupId)
+            && (resource.data.authorUid == request.auth.uid || isAdmin(groupId));
+        }
       }
+
+      // ---- Nudges ----------------------------------------------------------
+      //
+      // The document id is the recipient and the day, and nobody but the
+      // recipient may update one. So "one nudge per person per day" is
+      // enforced here rather than by a check a modified client could skip:
+      // a second attempt in a day is an update of a document that already
+      // exists, and nothing grants that.
+
+      match /nudges/{nudgeId} {
+        allow read: if isMember(groupId);
+        allow create: if isMember(groupId)
+          && request.resource.data.fromUid == request.auth.uid
+          && request.resource.data.toUid != request.auth.uid
+          && request.resource.data.seen == false;
+        // Only the person nudged can act on it, and only to mark it read.
+        allow update: if isOwner(resource.data.toUid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen']);
+        allow delete: if isAdmin(groupId);
+      }
+    }
+
+    // A nudge addressed to you, found without knowing which group it came
+    // from. The condition is what makes the collection-group query legal at
+    // all: it can only ever return documents whose recipient is the reader.
+    match /{path=**}/nudges/{nudgeId} {
+      allow read: if signedIn() && resource.data.toUid == request.auth.uid;
     }
   }
 }
