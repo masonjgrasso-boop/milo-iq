@@ -1,75 +1,28 @@
-import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '../context/auth-context';
-import { useToast } from '../context/toast-context';
-import { deletePhoto, listPhotos, uploadPhoto, type ProgressPhoto } from '../data/photos';
+// The full photo timeline, and the side-by-side compare.
+//
+// Reached from the Progress photos section at the foot of Trends rather than
+// from a tab of its own: adding this week's photo and glancing at the last
+// few is something you do in passing, but going back through the whole lot is
+// something you set out to do.
+
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { usePhotos } from '../hooks/usePhotos';
+import { type ProgressPhoto } from '../data/photos';
 import { formatBytes } from '../lib/images';
-import { todayKey, toWeekKey, weekKeyLabel, type WeekKey } from '../lib/dates';
-import { Button, Card, Eyebrow } from '../components/ui';
+import { weekKeyLabel, type WeekKey } from '../lib/dates';
+import { Card, Eyebrow } from '../components/ui';
+import { PhotoUploadCard } from '../components/PhotoUpload';
 import { Page } from '../components/Layout';
 
 export function Photos() {
-  const { user } = useAuth();
-  const notify = useToast();
-  const [photos, setPhotos] = useState<ProgressPhoto[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { photos, existing, thisWeek, busy, error, upload, remove } = usePhotos();
   const [viewing, setViewing] = useState<ProgressPhoto | null>(null);
   const [compare, setCompare] = useState<WeekKey[]>([]);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const thisWeek = toWeekKey(todayKey());
-
-  useEffect(() => {
-    if (!user) return;
-    listPhotos(user.uid)
-      .then(setPhotos)
-      .catch(() => {
-        setPhotos([]);
-        setError(
-          'Could not load photos. If this is a fresh project, Cloud Storage may not be ' +
-            'switched on yet — see the README.',
-        );
-      });
-  }, [user]);
-
-  const existing = photos?.find((photo) => photo.week === thisWeek) ?? null;
-
-  async function handleFile(file: File | undefined) {
-    if (!file || !user) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const photo = await uploadPhoto(user.uid, todayKey(), file);
-      setPhotos((current) => [
-        photo,
-        ...(current ?? []).filter((item) => item.week !== photo.week),
-      ]);
-      notify(`Photo saved for ${weekKeyLabel(photo.week)}`);
-    } catch (err) {
-      const message =
-        err instanceof Error && err.message.includes('not an image')
-          ? 'That file is not an image.'
-          : 'Upload failed. Check your connection and that Cloud Storage is enabled.';
-      setError(message);
-      notify(message, 'error');
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
-  }
 
   async function handleDelete(week: WeekKey) {
-    if (!user) return;
-    const previous = photos;
-    setPhotos((current) => (current ?? []).filter((photo) => photo.week !== week));
     setCompare((current) => current.filter((item) => item !== week));
-    try {
-      await deletePhoto(user.uid, week);
-      notify('Photo deleted');
-    } catch {
-      setPhotos(previous);
-      notify('Could not delete that photo. Check your connection.', 'error');
-    }
+    await remove(week);
   }
 
   function toggleCompare(week: WeekKey) {
@@ -86,43 +39,25 @@ export function Photos() {
     .sort((a, b) => a.week.localeCompare(b.week));
 
   return (
-    <Page eyebrow="Once a week" title="Photos" subtitle="The mirror lies; these do not.">
-      <Card className="flex flex-col gap-3">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(event) => handleFile(event.target.files?.[0])}
-        />
-        {/* The week being filled, named before the button that fills it. */}
-        {!existing && (
-          <div
-            className="flex h-[150px] items-center justify-center rounded-tile border-2
-              border-dashed border-line-dash font-mono text-xs text-ink-mute"
-            style={{
-              backgroundImage:
-                'repeating-linear-gradient(135deg, #f4f6f2 0 10px, #eef2ee 10px 20px)',
-            }}
-          >
-            {weekKeyLabel(thisWeek)}
-          </div>
-        )}
-        <Button onClick={() => fileRef.current?.click()} disabled={busy}>
-          {busy
-            ? 'Compressing and uploading…'
-            : existing
-              ? 'Replace this week’s photo'
-              : 'Add this week’s photo'}
-        </Button>
-        <p className="text-xs leading-relaxed text-ink-faint">
-          Compressed on your device to about 200 KB before anything is uploaded. One photo
-          per week — a second upload replaces the first.
-        </p>
-      </Card>
+    <Page
+      eyebrow="Once a week"
+      title="Photos"
+      subtitle="The mirror lies; these do not."
+      back={
+        <Link to="/trends" className="text-[13px] font-bold text-ink-mute hover:text-ink-soft">
+          &larr; Trends
+        </Link>
+      }
+    >
+      <PhotoUploadCard
+        existing={existing}
+        thisWeek={thisWeek}
+        busy={busy}
+        onPick={upload}
+      />
 
       {error && (
-        <p role="alert" className="mt-3 text-sm text-danger">
+        <p role="alert" className="text-sm font-semibold text-danger">
           {error}
         </p>
       )}

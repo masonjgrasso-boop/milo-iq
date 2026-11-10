@@ -117,7 +117,16 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.adminUid == request.auth.uid;
-      allow update: if isAdmin(groupId);
+      // The admin may change anything here. A member may move the
+      // "something was posted" marker forward and nothing else, which is what
+      // lets the dot on the Groups tab cost one small read per group instead
+      // of a query of every feed.
+      function onlyLastPostAt() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['lastPostAt']);
+      }
+      allow update: if isAdmin(groupId)
+        || (isMember(groupId) && onlyLastPostAt());
       allow delete: if isAdmin(groupId);
 
       // Membership. A member writes their own record and may never change

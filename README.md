@@ -35,8 +35,8 @@ Three things follow from that:
 | **Rules** | Daily yes/no, daily numeric, and weekly limits, with streaks |
 | **Workouts** | Sets, weight and reps, prefilled from last time |
 | **Strength graph** | Estimated 1RM, so more reps counts as progress too |
-| **Progress photos** | One a week, compressed on device, with side-by-side comparison |
-| **Groups** | A private feed for a handful of people: posts, reactions, comments, and a nudge when somebody goes quiet. Share only what you tick |
+| **Progress photos** | One a week, compressed on device, with side-by-side comparison. Lives at the foot of Trends |
+| **Groups** | A private feed for a handful of people: posts, reactions, comments, and a nudge when somebody goes quiet. You pick what to share before you are in |
 | **Your data** | Full JSON/CSV export and real account deletion |
 
 ---
@@ -275,6 +275,13 @@ Two deliberate choices worth knowing about:
   renames, deletes, and can take down a post or a comment. They get no extra sight of
   anybody's data — there is deliberately no role that can read more than its owner
   shared.
+- **Sharing is chosen before you are in, not discovered afterwards.** Joining or creating
+  a group asks about three things — stats, goals hit, progress photos — and writes
+  nothing until you answer. All three default to off.
+- **Automatic posts are gathered into one card a day per person.** Four things happening
+  on one Tuesday is one card with four lines, not four cards. The card's id is the member
+  and the day and each line is a keyed entry on it, which also makes writing one
+  idempotent: there is no backend here to remove a duplicate.
 - **Only photo thumbnails are shared.** A Firebase download URL is a bearer token that
   cannot be revoked without Cloud Functions, so the full-size image is never placed in a
   group-readable document.
@@ -291,8 +298,10 @@ Two deliberate choices worth knowing about:
 - Invite codes can be looked up but not listed, so they cannot be enumerated.
 - Members write only their own membership record, so nobody can add someone else to a
   group or alter another member's share settings.
-- 103 rule tests run against the real emulator and assert the denials, not just the
+- 110 rule tests run against the real emulator and assert the denials, not just the
   permissions.
+- A member may move a group's "something was posted" marker and change nothing else on
+  it, so the dot on the Groups tab costs one small read rather than a wider grant.
 - App Check can attest that requests come from your app rather than a script, and the
   web API key can be restricted to your own domains. Both are set up in step 10 and
   neither replaces the rules.

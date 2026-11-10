@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   generateInviteCode, normalizeInviteCode, isValidInviteCode, INVITE_CODE_LENGTH,
-  buildSharedSummary, daysInactive, isInactive,
-  DEFAULT_SHARING, INACTIVE_AFTER_DAYS, NO_SHARING,
+  buildSharedSummary, daysInactive, isInactive, migrateShareFlags,
+  DEFAULT_SHARING, INACTIVE_AFTER_DAYS, JOIN_SHARE_KEYS, NO_SHARING,
   SHARE_KEYS, SHARE_LABELS, SHARE_DESCRIPTIONS,
   type ShareFlags, type ShareInput,
 } from './groups';
@@ -66,9 +66,7 @@ const exercises: Exercise[] = [
   { id: 'e2', name: 'Back squat', isCustom: false, bestE1rmKg: 150, lastDate: '2026-03-05' },
 ];
 
-const allOn: ShareFlags = {
-  calories: true, weight: true, workouts: true, rules: true, photos: true, activity: true,
-};
+const allOn: ShareFlags = { stats: true, goals: true, photos: true, activity: true };
 
 const input = (flags: ShareFlags): ShareInput => ({
   uid: 'u1',
@@ -101,10 +99,14 @@ describe('buildSharedSummary', () => {
   });
 
   it('includes only the sections that are switched on', () => {
-    const summary = buildSharedSummary(input({ ...NO_SHARING, calories: true }));
+    const summary = buildSharedSummary(input({ ...NO_SHARING, stats: true }));
+    // Stats is one decision covering both numbers, so both arrive together.
     expect(summary.calories).toBeDefined();
-    expect('weight' in summary).toBe(false);
+    expect(summary.weight).toBeDefined();
+    // The achievements are a separate decision, and were not made.
     expect('workouts' in summary).toBe(false);
+    expect('rules' in summary).toBe(false);
+    expect('photos' in summary).toBe(false);
   });
 
   it('shares calorie averages and the deficit', () => {
@@ -166,11 +168,71 @@ describe('buildSharedSummary', () => {
     expect(summary.photos!.length).toBeLessThanOrEqual(8);
   });
 
-  it('turning a flag off removes that section from the rebuilt mirror', () => {
+  it('turning a flag off removes every section it covered', () => {
     const on = buildSharedSummary(input(allOn));
     expect(on.calories).toBeDefined();
-    const off = buildSharedSummary(input({ ...allOn, calories: false }));
+    expect(on.weight).toBeDefined();
+
+    // Stats is one decision covering both numbers, so both go together.
+    const off = buildSharedSummary(input({ ...allOn, stats: false }));
     expect('calories' in off).toBe(false);
+    expect('weight' in off).toBe(false);
+    // And the achievements, which are a different decision, stay.
+    expect(off.rules).toBeDefined();
+    expect(off.workouts).toBeDefined();
+  });
+
+  it('turning goals off removes the achievements and leaves the numbers', () => {
+    const off = buildSharedSummary(input({ ...allOn, goals: false }));
+    expect('rules' in off).toBe(false);
+    expect('workouts' in off).toBe(false);
+    expect(off.calories).toBeDefined();
+  });
+});
+
+describe('migrating the old share flags', () => {
+  it('folds a flag per section into the three', () => {
+    // Somebody who shared their weight but not their calories was sharing a
+    // number either way, so stats comes on rather than their choice resetting.
+    expect(migrateShareFlags({ calories: false, weight: true, rules: false, photos: false }))
+      .toEqual({ stats: true, goals: false, photos: false, activity: true });
+
+    expect(migrateShareFlags({ calories: false, weight: false, rules: true, workouts: false }))
+      .toEqual({ stats: false, goals: true, photos: false, activity: true });
+  });
+
+  it('keeps photos, which did not change meaning', () => {
+    expect(migrateShareFlags({ photos: true }).photos).toBe(true);
+  });
+
+  it('turns nothing on for somebody who shared nothing', () => {
+    const migrated = migrateShareFlags({
+      calories: false, weight: false, workouts: false, rules: false, photos: false,
+    });
+    expect(migrated).toEqual({
+      stats: false, goals: false, photos: false, activity: true,
+    });
+  });
+
+  it('leaves a record that is already the new shape alone', () => {
+    const current = { stats: true, goals: false, photos: true, activity: false };
+    expect(migrateShareFlags(current)).toEqual(current);
+  });
+
+  it('copes with a record that has no flags at all', () => {
+    expect(migrateShareFlags(undefined)).toEqual({
+      stats: false, goals: false, photos: false, activity: true,
+    });
+    expect(migrateShareFlags({})).toEqual({
+      stats: false, goals: false, photos: false, activity: true,
+    });
+  });
+
+  it('never reads a stray value as a yes', () => {
+    const odd = { stats: 'yes', goals: 1 } as unknown;
+    expect(migrateShareFlags(odd)).toEqual({
+      stats: false, goals: false, photos: false, activity: true,
+    });
   });
 });
 
@@ -190,9 +252,12 @@ describe('share metadata', () => {
 });
 
 describe('what a new member starts with', () => {
+  it('asks about exactly three things before letting somebody in', () => {
+    expect(JOIN_SHARE_KEYS).toEqual(['stats', 'goals', 'photos']);
+  });
+
   it('shares nothing substantive until they say so', () => {
-    for (const key of SHARE_KEYS) {
-      if (key === 'activity') continue;
+    for (const key of JOIN_SHARE_KEYS) {
       expect(DEFAULT_SHARING[key]).toBe(false);
     }
   });
@@ -258,7 +323,7 @@ describe('the weekly deficit across a goal change', () => {
   ];
 
   it('scores each day against the goal that was active on it', () => {
-    const shared = buildSharedSummary({ ...input({ ...NO_SHARING, calories: true }), goalHistory: history });
+    const shared = buildSharedSummary({ ...input({ ...NO_SHARING, stats: true }), goalHistory: history });
 
     // Three days on a 2,000 target and two on 2,600 blends to 2,240, so five
     // days at 1,900 sit 1,700 under. Against today's 2,000 alone it would
@@ -267,13 +332,13 @@ describe('the weekly deficit across a goal change', () => {
   });
 
   it('still shows today’s target, which is the number that means something', () => {
-    const shared = buildSharedSummary({ ...input({ ...NO_SHARING, calories: true }), goalHistory: history });
+    const shared = buildSharedSummary({ ...input({ ...NO_SHARING, stats: true }), goalHistory: history });
     expect(shared.calories?.target).toBe(2000);
   });
 
   it('is unchanged for a member who has never changed goals', () => {
-    const plain = buildSharedSummary(input({ ...NO_SHARING, calories: true }));
-    const empty = buildSharedSummary({ ...input({ ...NO_SHARING, calories: true }), goalHistory: [] });
+    const plain = buildSharedSummary(input({ ...NO_SHARING, stats: true }));
+    const empty = buildSharedSummary({ ...input({ ...NO_SHARING, stats: true }), goalHistory: [] });
     expect(plain.calories).toEqual(empty.calories);
     // Five days at 1,900 against a flat 2,000 target.
     expect(plain.calories?.deficit).toBe(500);

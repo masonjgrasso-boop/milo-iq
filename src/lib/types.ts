@@ -23,6 +23,15 @@ export interface GoalPeriod {
   targetRateKgPerWeek: number;
   /** The daily calorie target this goal was saved with. */
   calorieTarget: number;
+  /**
+   * The trend weight when this goal started.
+   *
+   * What milestones are measured from, so switching from losing to gaining
+   * counts progress again from scratch rather than inheriting a tally that
+   * now means the opposite. Absent on goals saved before milestones existed,
+   * where the caller falls back to the profile's starting weight.
+   */
+  startWeightKg?: number;
 }
 
 export interface UserProfile {

@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
-  autoPostId, nudgeId, nudgeMessage, photoPost, rulesPost, tallyReactions,
-  toggleReaction, visiblePosts, weightPost, workoutPost,
-  KIND_FLAG, MAX_BODY, PAGE_SIZE, REACTIONS,
-  type FeedPost, type Reaction,
+  calorieWeekPost, digestId, digestItems, itemsFor, loggingStreak, milestonePost,
+  milestonesReached, milestoneStepKg, nudgeId, nudgeMessage, photoPost, rulesPost,
+  streakMilestone, streakPost, tallyReactions, toggleReaction, visiblePosts,
+  weightPost, withoutItems, workoutPost,
+  ITEM_FLAG, ITEM_ORDER, MAX_BODY, MILESTONE_KG, MILESTONE_LB, PAGE_SIZE, REACTIONS,
+  STREAK_MILESTONES,
+  type FeedPost, type ItemKind, type PostItem, type Reaction,
 } from './feed';
 import { lbToKg } from './units';
 
@@ -14,35 +17,91 @@ const post = (id: string, authorUid: string): FeedPost => ({
   kind: 'note',
 });
 
-describe('automatic post ids', () => {
-  it('are the same every time for the same event', () => {
-    expect(autoPostId('rules', 'alice', '2026-11-09'))
-      .toBe(autoPostId('rules', 'alice', '2026-11-09'));
-  });
+const day = (date: string, calories: number) => ({ date, calories });
 
-  it('separate the kind, the member and the period', () => {
-    expect(autoPostId('weight', 'alice', '2026-W45')).toBe('weight_alice_2026-W45');
-    expect(autoPostId('rules', 'alice', '2026-W45')).not
-      .toBe(autoPostId('weight', 'alice', '2026-W45'));
-    expect(autoPostId('weight', 'bob', '2026-W45')).not
-      .toBe(autoPostId('weight', 'alice', '2026-W45'));
+describe('the digest', () => {
+  it('is one card per member per day, which is the whole anti-spam trick', () => {
+    expect(digestId('alice', '2026-11-09')).toBe(digestId('alice', '2026-11-09'));
+    expect(digestId('alice', '2026-11-09')).not.toBe(digestId('alice', '2026-11-10'));
+    expect(digestId('bob', '2026-11-09')).not.toBe(digestId('alice', '2026-11-09'));
   });
 
   it('never contains a slash, which would split the document path', () => {
-    expect(autoPostId('workout', 'alice', '2026-11-09_day1')).not.toContain('/');
+    expect(digestId('alice', '2026-11-09')).not.toContain('/');
+  });
+
+  it('reads its lines in a fixed order, best news first', () => {
+    const digest: FeedPost = {
+      ...post('d1', 'alice'),
+      kind: 'digest',
+      items: {
+        weight: weightPost(-0.5, 'metric'),
+        milestone: milestonePost(1, 'metric', 'lose'),
+        workout: workoutPost('Legs'),
+      },
+    };
+    expect(digestItems(digest).map((item) => item.kind))
+      .toEqual(['milestone', 'workout', 'weight']);
+  });
+
+  it('orders every kind it knows about', () => {
+    expect([...ITEM_ORDER].sort()).toEqual(
+      (Object.keys(ITEM_FLAG) as ItemKind[]).sort(),
+    );
+  });
+
+  it('is empty rather than broken for a digest with no lines', () => {
+    expect(digestItems({ ...post('d2', 'alice'), kind: 'digest' })).toEqual([]);
+    expect(digestItems({ ...post('d3', 'alice'), kind: 'digest', items: {} })).toEqual([]);
+  });
+
+  it('skips a line that arrived without a headline', () => {
+    const odd = { weight: { kind: 'weight' } as unknown as PostItem };
+    expect(digestItems({ ...post('d4', 'alice'), kind: 'digest', items: odd })).toEqual([]);
   });
 });
 
-describe('which flag gates which post', () => {
-  it('gates every automatic kind on the matching sharing flag', () => {
-    expect(KIND_FLAG.weight).toBe('weight');
-    expect(KIND_FLAG.rules).toBe('rules');
-    expect(KIND_FLAG.workout).toBe('workouts');
-    expect(KIND_FLAG.photo).toBe('photos');
+describe('which flag gates which line', () => {
+  it('puts the two numbers under stats', () => {
+    expect(ITEM_FLAG.weight).toBe('stats');
+    expect(ITEM_FLAG.calorieWeek).toBe('stats');
   });
 
-  it('gates a member’s own words on nothing but writing them', () => {
-    expect(KIND_FLAG.note).toBeNull();
+  it('puts every achievement under goals', () => {
+    expect(ITEM_FLAG.rules).toBe('goals');
+    expect(ITEM_FLAG.workout).toBe('goals');
+    expect(ITEM_FLAG.milestone).toBe('goals');
+    expect(ITEM_FLAG.streak).toBe('goals');
+  });
+
+  it('can name the lines a flag is responsible for', () => {
+    expect(itemsFor('stats').sort()).toEqual(['calorieWeek', 'weight']);
+    expect(itemsFor('goals').sort()).toEqual(['milestone', 'rules', 'streak', 'workout']);
+    expect(itemsFor('photos')).toEqual(['photo']);
+    expect(itemsFor('activity')).toEqual([]);
+  });
+});
+
+describe('withoutItems', () => {
+  const items: Partial<Record<ItemKind, PostItem>> = {
+    weight: weightPost(-0.5, 'metric'),
+    workout: workoutPost('Legs'),
+  };
+
+  it('keeps the lines a flag is not responsible for', () => {
+    const kept = withoutItems(items, itemsFor('goals'));
+    expect(kept).not.toBeNull();
+    expect(Object.keys(kept ?? {})).toEqual(['weight']);
+  });
+
+  it('reports nothing left when every line goes', () => {
+    expect(withoutItems(items, ['weight', 'workout'])).toBeNull();
+    expect(withoutItems(undefined, ['weight'])).toBeNull();
+  });
+
+  it('leaves the original alone', () => {
+    withoutItems(items, ['weight']);
+    expect(Object.keys(items).sort()).toEqual(['weight', 'workout']);
   });
 });
 
@@ -65,14 +124,12 @@ describe('weightPost', () => {
   });
 
   it('never leaks the weight itself, only the change', () => {
-    const body = weightPost(-1, 'metric');
-    expect(JSON.stringify(body)).not.toContain('80');
+    expect(JSON.stringify(weightPost(-1, 'metric'))).not.toContain('80');
   });
 
   it('carries a spark line only when there is more than one point', () => {
     expect(weightPost(-1, 'metric', [80, 79.5]).spark).toEqual([80, 79.5]);
     expect(weightPost(-1, 'metric', [80]).spark).toBeUndefined();
-    expect(weightPost(-1, 'metric').spark).toBeUndefined();
   });
 });
 
@@ -98,14 +155,107 @@ describe('workoutPost', () => {
   });
 
   it('stops listing after three and counts the rest', () => {
-    const detail = workoutPost('Legs', ['A', 'B', 'C', 'D', 'E']).detail;
-    expect(detail).toBe('New best on A, B, C and 2 more');
+    expect(workoutPost('Legs', ['A', 'B', 'C', 'D', 'E']).detail)
+      .toBe('New best on A, B, C and 2 more');
+  });
+});
+
+describe('calorieWeekPost', () => {
+  it('says the goal was met, and how much was logged', () => {
+    expect(calorieWeekPost(6).headline).toBe('Hit their calorie goal this week');
+    expect(calorieWeekPost(6).detail).toBe('6 days logged');
+    expect(calorieWeekPost(1).detail).toBe('1 day logged');
+  });
+});
+
+describe('weight milestones', () => {
+  it('steps every 2 kg for a metric member and 5 lb for an imperial one', () => {
+    expect(milestoneStepKg('metric')).toBe(MILESTONE_KG);
+    expect(milestoneStepKg('imperial')).toBeCloseTo(lbToKg(MILESTONE_LB), 6);
+  });
+
+  it('counts whole steps of progress toward a lose goal', () => {
+    expect(milestonesReached(80, 78, 'lose', 'metric')).toBe(1);
+    expect(milestonesReached(80, 77.9, 'lose', 'metric')).toBe(1);
+    expect(milestonesReached(80, 76, 'lose', 'metric')).toBe(2);
+  });
+
+  it('counts the other way for a gain goal', () => {
+    expect(milestonesReached(80, 82, 'gain', 'metric')).toBe(1);
+    // Losing weight on a gain goal is not progress.
+    expect(milestonesReached(80, 78, 'gain', 'metric')).toBe(0);
+  });
+
+  it('counts nothing before the first step is complete', () => {
+    expect(milestonesReached(80, 79, 'lose', 'metric')).toBe(0);
+    expect(milestonesReached(80, 80, 'lose', 'metric')).toBe(0);
+    // Going the wrong way is not a negative milestone.
+    expect(milestonesReached(80, 82, 'lose', 'metric')).toBe(0);
+  });
+
+  it('has no milestones at all for maintaining', () => {
+    expect(milestonesReached(80, 70, 'maintain', 'metric')).toBe(0);
+  });
+
+  it('uses pounds for an imperial member', () => {
+    // 5 lb is about 2.27 kg, so a 2 kg drop is not yet a milestone.
+    expect(milestonesReached(80, 78, 'lose', 'imperial')).toBe(0);
+    expect(milestonesReached(80, 77.6, 'lose', 'imperial')).toBe(1);
+  });
+
+  it('names the total, not the step', () => {
+    expect(milestonePost(2, 'imperial', 'lose').headline).toBe('10 lb down');
+    expect(milestonePost(3, 'metric', 'lose').headline).toBe('6 kg down');
+    expect(milestonePost(1, 'metric', 'gain').headline).toBe('2 kg on');
+  });
+});
+
+describe('logging streaks', () => {
+  const run = (dates: string[]) => dates.map((date) => day(date, 2000));
+
+  it('counts consecutive logged days up to today', () => {
+    expect(loggingStreak(run(['2026-11-07', '2026-11-08', '2026-11-09']), '2026-11-09'))
+      .toBe(3);
+  });
+
+  it('does not look broken before breakfast', () => {
+    // Today has nothing on it yet, so the streak runs to yesterday.
+    const days = [...run(['2026-11-07', '2026-11-08']), day('2026-11-09', 0)];
+    expect(loggingStreak(days, '2026-11-09')).toBe(2);
+  });
+
+  it('stops at a gap', () => {
+    const days = [...run(['2026-11-05', '2026-11-06']), day('2026-11-07', 0),
+      ...run(['2026-11-08', '2026-11-09'])];
+    expect(loggingStreak(days, '2026-11-09')).toBe(2);
+  });
+
+  it('is zero when neither today nor yesterday was logged', () => {
+    expect(loggingStreak(run(['2026-11-01']), '2026-11-09')).toBe(0);
+    expect(loggingStreak([], '2026-11-09')).toBe(0);
+  });
+
+  it('only celebrates the lengths worth celebrating', () => {
+    expect(STREAK_MILESTONES).toEqual([7, 30, 100]);
+    expect(streakMilestone(6)).toBe(0);
+    expect(streakMilestone(7)).toBe(7);
+    expect(streakMilestone(29)).toBe(7);
+    expect(streakMilestone(30)).toBe(30);
+    expect(streakMilestone(150)).toBe(100);
+  });
+
+  it('names the streak it reached', () => {
+    expect(streakPost(30).headline).toBe('30 days logged in a row');
+    expect(streakPost(100).detail).toBe('Three figures');
   });
 });
 
 describe('photoPost', () => {
   it('says what it is without describing the picture', () => {
     expect(photoPost('2026-W45').headline).toBe('Posted a progress photo');
+    expect(photoPost('2026-W45', 'https://x.test/t.jpg').thumbUrl)
+      .toBe('https://x.test/t.jpg');
+    expect(photoPost('2026-W45').thumbUrl).toBeUndefined();
   });
 });
 
@@ -116,10 +266,8 @@ describe('visiblePosts', () => {
   });
 
   it('drops a departed member’s posts even if the delete did not finish', () => {
-    // The promise is that leaving removes your posts. The batch that deletes
-    // them can fail half way, so the feed refuses to render them either way.
-    const posts = [post('1', 'alice'), post('2', 'bob')];
-    expect(visiblePosts(posts, ['alice']).map((p) => p.id)).toEqual(['1']);
+    expect(visiblePosts([post('1', 'alice'), post('2', 'bob')], ['alice']).map((p) => p.id))
+      .toEqual(['1']);
   });
 
   it('shows nothing when nobody is a member', () => {
@@ -151,12 +299,9 @@ describe('reactions', () => {
 
   it('adds, swaps and removes without touching anyone else', () => {
     const start: Record<string, Reaction> = { alice: 'fire' };
-
     expect(toggleReaction(start, 'bob', 'thumb')).toEqual({ alice: 'fire', bob: 'thumb' });
     expect(toggleReaction(start, 'alice', 'flex')).toEqual({ alice: 'flex' });
-    // Tapping the one you already left takes it off.
     expect(toggleReaction(start, 'alice', 'fire')).toEqual({});
-    // And never mutates what it was given.
     expect(start).toEqual({ alice: 'fire' });
   });
 });

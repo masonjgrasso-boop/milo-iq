@@ -13,13 +13,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
 import {
   deleteGroup, forgetGroup, getGroup, getSharedSummary, leaveGroup, listMembers,
-  publishShare, removeMember, renameGroup, syncMembershipName, transferAdmin,
-  updateShareFlags,
+  markGroupSeen, publishShare, removeMember, renameGroup, syncMembershipName,
+  touchGroupActivity, transferAdmin, updateShareFlags,
   type Group, type GroupMember,
 } from '../data/groups';
 import {
   addComment, createPost, deleteAuthorPosts, deleteComment, deletePost, listComments,
-  listPosts, nudgesSentToday, sendNudge, setReactions, uploadPostImage,
+  listPosts, nudgesSentToday, pruneAuthorItems, sendNudge, setReactions, uploadPostImage,
   type FeedCursor,
 } from '../data/posts';
 import { listDays } from '../data/days';
@@ -27,18 +27,18 @@ import { listRules } from '../data/rules';
 import { listExercises } from '../data/workouts';
 import { listPhotos } from '../data/photos';
 import {
-  buildSharedSummary, daysInactive, isInactive,
-  SHARE_DESCRIPTIONS, SHARE_KEYS, SHARE_LABELS,
+  buildSharedSummary, daysInactive, isInactive, SHARE_KEYS,
   type ShareFlags, type ShareKey, type SharedSummary,
 } from '../lib/groups';
 import {
-  nudgeId, visiblePosts, KIND_FLAG,
-  type FeedComment, type FeedPost, type PostKind, type Reaction,
+  itemsFor, nudgeId, visiblePosts,
+  type FeedComment, type FeedPost, type Reaction,
 } from '../lib/feed';
 import { displayNameFor } from '../lib/display';
 import { addDays, friendlyDayLabel, todayKey, weekKeyLabel } from '../lib/dates';
 import { fromKg, weightUnitLabel } from '../lib/units';
 import { Button, Card, ConfirmDialog, Eyebrow, Segmented, TextInput } from '../components/ui';
+import { ShareChoices } from '../components/ShareChoices';
 import { Avatar, PostCard } from '../components/PostCard';
 import { PostComposer, type ComposedPost } from '../components/PostComposer';
 import { Page } from '../components/Layout';
@@ -92,6 +92,8 @@ export function GroupDetail() {
 
     // The admin may have renamed the group since we last looked.
     syncMembershipName(user.uid, groupId, found.name).catch(() => undefined);
+    // And looking at it is what clears the dot on the Groups tab.
+    markGroupSeen(user.uid, groupId);
     setLoading(false);
   }, [groupId, user]);
 
@@ -148,14 +150,13 @@ export function GroupDetail() {
     );
     await updateShareFlags(user.uid, groupId, flags);
 
-    // Turning a category off takes the posts it produced with it, which is
-    // the promise the sharing screen makes.
+    // Turning a category off takes what it published with it, which is the
+    // promise the sharing screen makes. Because one card can carry lines from
+    // more than one category, this prunes lines rather than deleting posts:
+    // a card left with nothing on it goes, one with a line from another
+    // category keeps that line.
     if (!flags[key]) {
-      const kinds = (Object.keys(KIND_FLAG) as PostKind[])
-        .filter((kind) => KIND_FLAG[kind] === key);
-      if (kinds.length > 0) {
-        await deleteAuthorPosts(groupId, user.uid, kinds).catch(() => undefined);
-      }
+      await pruneAuthorItems(groupId, user.uid, itemsFor(key)).catch(() => undefined);
     }
 
     await republish(flags);
@@ -320,6 +321,7 @@ function Feed({ groupId, uid, authorName, authorPhoto, isAdmin, members, memberU
         await deletePost(groupId, created.id).catch(() => undefined);
       }
 
+      await touchGroupActivity(groupId);
       setComposing(false);
       await loadFirst();
     } catch {
@@ -736,24 +738,11 @@ function Sharing({
 
       <Eyebrow>What you share here</Eyebrow>
       <Card>
-        <ul className="flex flex-col divide-y divide-line-soft">
-          {SHARE_KEYS.map((key) => (
-            <li key={key} className="py-3 first:pt-0 last:pb-0">
-              <label className="flex cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={flags?.[key] ?? false}
-                  onChange={() => onToggle(key)}
-                  className="mt-0.5 h-5 w-5 shrink-0 rounded border-line-in accent-brand"
-                />
-                <span>
-                  <span className="block text-sm font-bold text-ink">{SHARE_LABELS[key]}</span>
-                  <span className="block text-xs text-ink-mute">{SHARE_DESCRIPTIONS[key]}</span>
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
+        <ShareChoices
+          flags={flags ?? { stats: false, goals: false, photos: false, activity: true }}
+          keys={SHARE_KEYS}
+          onToggle={onToggle}
+        />
         <p className="mt-3 text-xs text-ink-mute">
           Unticking something removes it from this group straight away, along with any
           posts it made. Anything you do not tick is never written anywhere the group can

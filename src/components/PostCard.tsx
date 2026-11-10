@@ -10,8 +10,8 @@
 
 import { useState } from 'react';
 import {
-  tallyReactions, toggleReaction, REACTIONS,
-  type FeedComment, type FeedPost, type Reaction,
+  digestItems, tallyReactions, toggleReaction, REACTIONS,
+  type FeedComment, type FeedPost, type PostItem, type Reaction,
 } from '../lib/feed';
 import { Card } from './ui';
 
@@ -131,6 +131,7 @@ export function PostCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { counts, mine } = tallyReactions(post.reactions, uid);
+  const items = post.kind === 'digest' ? digestItems(post) : [];
 
   function openComments() {
     if (!open && comments === null) onLoadComments();
@@ -166,16 +167,21 @@ export function PostCard({
         )}
       </div>
 
-      {post.headline && (
-        <p className="text-[15px] font-bold leading-snug text-ink">{post.headline}</p>
+      {/* A digest's lines. One line reads as a single post; several read as
+          a list, which is the point: four things on one Tuesday is one card. */}
+      {items.length > 0 && (
+        <ul className="flex flex-col gap-2.5">
+          {items.map((item) => (
+            <DigestLine key={item.kind} item={item} alone={items.length === 1} />
+          ))}
+        </ul>
       )}
-      {post.detail && <p className="text-[13px] text-ink-mute">{post.detail}</p>}
+
       {post.body && (
         <p className="whitespace-pre-wrap text-[15px] leading-snug text-ink-soft">
           {post.body}
         </p>
       )}
-      {post.spark && <Spark points={post.spark} />}
       {post.thumbUrl && (
         <img
           src={post.thumbUrl}
@@ -300,5 +306,41 @@ export function PostCard({
         </div>
       )}
     </Card>
+  );
+}
+
+/**
+ * One line on a digest.
+ *
+ * A card with a single line should look like an ordinary post, so the bullet
+ * only appears once there is more than one thing to separate.
+ */
+function DigestLine({ item, alone }: { item: PostItem; alone: boolean }) {
+  return (
+    <li className="flex items-start gap-2">
+      {!alone && (
+        <span
+          aria-hidden="true"
+          className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-brand-lite"
+        />
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-bold leading-snug text-ink">
+          {item.headline}
+        </span>
+        {item.detail && (
+          <span className="block text-[13px] text-ink-mute">{item.detail}</span>
+        )}
+        {item.spark && <Spark points={item.spark} />}
+        {item.thumbUrl && (
+          <img
+            src={item.thumbUrl}
+            alt=""
+            className="mt-2 h-24 w-[72px] rounded-tile object-cover"
+            loading="lazy"
+          />
+        )}
+      </span>
+    </li>
   );
 }

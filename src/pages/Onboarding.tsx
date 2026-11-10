@@ -89,6 +89,7 @@ export function Onboarding() {
         goal,
         targetRateKgPerWeek: rate,
         calorieTarget: preview.calorieTarget,
+        startWeightKg: weightKg,
       }],
     };
 

@@ -23,7 +23,11 @@ import {
 } from 'firebase/firestore';
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { getDb, getFirebaseStorage } from '../lib/firebase';
-import { PAGE_SIZE, type FeedComment, type FeedPost, type Nudge, type PostKind, type Reaction } from '../lib/feed';
+import {
+  withoutItems, PAGE_SIZE,
+  type FeedComment, type FeedPost, type ItemKind, type Nudge, type PostItem,
+  type PostKind, type Reaction,
+} from '../lib/feed';
 import type { DayKey } from '../lib/dates';
 import { groupRef } from './groups';
 
@@ -97,21 +101,29 @@ export async function createPost(groupId: string, post: NewPost): Promise<FeedPo
 }
 
 /**
- * Writes an automatic post under an id derived from the event it describes,
- * so running the same check twice cannot produce two posts.
+ * Adds or replaces one line on a member's digest for the day.
  *
- * Merged rather than overwritten for one reason: an overwrite would wipe the
- * reactions people have already left on it. The payload never contains a
- * `reactions` key, so merging leaves them alone.
+ * Merged, which is what makes the digest work. The id is the member and the
+ * day, so the first line of the day creates the card and every later line
+ * joins it; each line is one key in the `items` map, so writing the same
+ * line twice replaces it rather than adding a duplicate. The payload never
+ * contains a `reactions` key, so merging also leaves alone whatever people
+ * have already left on the card.
  */
-export async function writeAutoPost(
+export async function writeDigestItem(
   groupId: string,
   postId: string,
-  post: NewPost,
+  post: Omit<NewPost, 'kind'>,
+  item: PostItem,
 ): Promise<void> {
   await setDoc(
     postRef(groupId, postId),
-    { ...post, createdAt: serverTimestamp() },
+    {
+      ...post,
+      kind: 'digest',
+      items: { [item.kind]: item },
+      createdAt: serverTimestamp(),
+    },
     { merge: true },
   );
 }
@@ -132,13 +144,10 @@ export async function deletePost(groupId: string, postId: string): Promise<void>
 const BATCH_LIMIT = 400;
 
 /**
- * Clears a member's posts from a group.
+ * Clears everything a member posted in a group.
  *
- * Called when somebody leaves, is removed, or turns a category off. Without
- * `kinds` it clears everything they posted; with it, only those kinds, which
- * is what turning a single sharing flag off should do.
- *
- * Returns how many went, so a caller can say so.
+ * Called when somebody leaves or is removed. Returns how many went, so a
+ * caller can say so.
  */
 export async function deleteAuthorPosts(
   groupId: string,
@@ -162,6 +171,40 @@ export async function deleteAuthorPosts(
     written += Math.min(BATCH_LIMIT, doomed.length - i);
   }
   return written;
+}
+
+/**
+ * Takes certain kinds of line out of a member's digests.
+ *
+ * This is what unticking a category does to history. Because one card can
+ * carry lines from more than one category, it is not a matter of deleting
+ * posts: a card that was only ever a workout goes entirely, and one that
+ * also held a weight line keeps that line and loses the rest.
+ */
+export async function pruneAuthorItems(
+  groupId: string,
+  authorUid: string,
+  removing: ItemKind[],
+): Promise<void> {
+  if (removing.length === 0) return;
+
+  const snap = await getDocs(
+    query(postsCollection(groupId), where('authorUid', '==', authorUid)),
+  );
+  const digests = snap.docs.filter(
+    (document) => (document.data() as FeedPost).kind === 'digest',
+  );
+
+  for (let i = 0; i < digests.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(getDb());
+    for (const document of digests.slice(i, i + BATCH_LIMIT)) {
+      const kept = withoutItems((document.data() as FeedPost).items, removing);
+      // An update replaces the whole map, which is what leaves only `kept`.
+      if (kept === null) batch.delete(document.ref);
+      else batch.update(document.ref, { items: kept });
+    }
+    await batch.commit();
+  }
 }
 
 /* --------------------------------------------------------------- comments */

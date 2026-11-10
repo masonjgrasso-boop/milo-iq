@@ -302,12 +302,17 @@ function GoalForm({ profile, onDone, onCancel }: {
       goal,
       targetRateKgPerWeek: rateKgPerWeek,
       calorieTarget: preview.calorieTarget,
+      // Where milestones toward this goal are counted from.
+      startWeightKg: Number(weightKg.toFixed(2)),
     };
     const currentGoal = {
       goal: profile.goal,
       targetRateKgPerWeek: profile.targetRateKgPerWeek,
       calorieTarget: profile.calorieTarget,
     };
+    // The goal being left is dated from the account's start, so the weight it
+    // began at is the onboarding one rather than today's.
+    const previousGoal = { ...currentGoal, startWeightKg: profile.weightKg };
 
     const updated: UserProfile = {
       ...profile,
@@ -326,7 +331,7 @@ function GoalForm({ profile, onDone, onCancel }: {
           // day before the change is the fallback purely so the two entries
           // cannot collide on the same start date.
           startDate: profileStartDate(profile) ?? addDays(startDate, -1),
-          ...currentGoal,
+          ...previousGoal,
         },
         next: { startDate, ...nextGoal },
       });

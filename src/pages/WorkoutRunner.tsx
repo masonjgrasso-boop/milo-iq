@@ -228,8 +228,7 @@ function Runner({ routineId, uid, profile }: {
                 name: displayNameFor(user),
                 ...(user.photoURL ? { photo: user.photoURL } : {}),
               },
-              'workout',
-              `${date}_${routine.id}`,
+              date,
               workoutPost(routine.name, done.newBests.map((best) => best.name)),
             ),
           )

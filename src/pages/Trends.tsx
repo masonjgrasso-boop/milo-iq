@@ -36,7 +36,9 @@ import { estimateTdee } from '../lib/targets';
 import { trendChangeKg, trendSeries } from '../lib/trend';
 import { formatWeight, fromKg, weightUnitLabel } from '../lib/units';
 import type { PeriodSummary, UserProfile } from '../lib/types';
+import { usePhotos } from '../hooks/usePhotos';
 import { Card, Eyebrow, Segmented, Stat } from '../components/ui';
+import { PhotoStrip, PhotoUploadCard } from '../components/PhotoUpload';
 import {
   CalorieChart, WeightChart, type CaloriePoint, type WeightPoint,
 } from '../components/charts';
@@ -444,6 +446,51 @@ function Body({
             target={profile.calorieTarget}
           />
         </>
+      )}
+
+      {/* Photos live here now rather than in a tab of their own: they are a
+          measure of progress, and this is the screen progress is read on. */}
+      <ProgressPhotos />
+    </>
+  );
+}
+
+/**
+ * The weekly photo, at the foot of Trends.
+ *
+ * The upload card and a strip of recent weeks; the full timeline and the
+ * side-by-side compare are one tap away behind "See all", because they are
+ * what you go looking for rather than what you glance at.
+ */
+function ProgressPhotos() {
+  const { photos, existing, thisWeek, busy, error, upload } = usePhotos();
+
+  return (
+    <>
+      <Eyebrow>Progress photos</Eyebrow>
+
+      <PhotoUploadCard
+        existing={existing}
+        thisWeek={thisWeek}
+        busy={busy}
+        onPick={upload}
+      />
+
+      {error && (
+        <p role="alert" className="text-sm font-semibold text-danger">
+          {error}
+        </p>
+      )}
+
+      {photos !== null && photos.length > 0 && <PhotoStrip photos={photos} />}
+
+      {photos !== null && photos.length === 0 && (
+        <Card tone="cream">
+          <p className="text-sm leading-relaxed text-ink-soft">
+            Weekly photos show change the scale misses entirely &mdash; especially in the
+            weeks where the number refuses to move.
+          </p>
+        </Card>
       )}
     </>
   );

@@ -26,7 +26,7 @@ import {
 } from 'firebase/firestore';
 import { getDb } from '../lib/firebase';
 import {
-  generateInviteCode, normalizeInviteCode, DEFAULT_SHARING,
+  generateInviteCode, migrateShareFlags, normalizeInviteCode, DEFAULT_SHARING,
   type GroupRole, type ShareFlags, type SharedSummary,
 } from '../lib/groups';
 
@@ -37,6 +37,15 @@ export interface Group {
   /** The one person who can invite, remove, rename and delete. */
   adminUid: string;
   createdBy: string;
+  /**
+   * When anything was last posted here.
+   *
+   * Denormalised onto the group so the dot on the Groups tab costs one small
+   * read per group rather than a query of every feed. Any member may move it
+   * forward, and the rules allow them to touch nothing else on this
+   * document.
+   */
+  lastPostAt?: unknown;
   createdAt?: unknown;
 }
 
@@ -62,6 +71,19 @@ export interface Membership {
    * document first.
    */
   shareFlags?: ShareFlags;
+  /** When this member last opened the group, for the new-posts dot. */
+  lastSeenAt?: unknown;
+  /**
+   * The highest achievement already announced to this group.
+   *
+   * Kept here, on the member's own pointer, so a milestone or a streak is
+   * announced once rather than once a day for as long as it stands. It has to
+   * be per group: somebody who joins in March should not arrive to a backlog
+   * of January's milestones.
+   */
+  lastMilestone?: number;
+  lastStreak?: number;
+  lastCalorieWeek?: string;
   joinedAt?: unknown;
 }
 
@@ -78,7 +100,12 @@ const membershipRef = (uid: string, groupId: string) =>
 
 export async function listMyGroups(uid: string): Promise<Membership[]> {
   const snap = await getDocs(query(membershipsCollection(uid), orderBy('joinedAt')));
-  return snap.docs.map((document) => document.data() as Membership);
+  return snap.docs.map((document) => {
+    const membership = document.data() as Membership;
+    // Older records carry a flag per section of the mirror; fold them into
+    // the three without resetting what the member chose.
+    return { ...membership, shareFlags: migrateShareFlags(membership.shareFlags) };
+  });
 }
 
 export async function getGroup(groupId: string): Promise<Group | null> {
@@ -88,14 +115,23 @@ export async function getGroup(groupId: string): Promise<Group | null> {
 
 export async function listMembers(groupId: string): Promise<GroupMember[]> {
   const snap = await getDocs(query(membersCollection(groupId), orderBy('joinedAt')));
-  return snap.docs.map((document) => document.data() as GroupMember);
+  return snap.docs.map((document) => {
+    const member = document.data() as GroupMember;
+    return { ...member, shareFlags: migrateShareFlags(member.shareFlags) };
+  });
 }
 
-/** Creates a group. Whoever makes it is its admin. */
+/**
+ * Creates a group. Whoever makes it is its admin.
+ *
+ * The sharing choices come in with the call, because they are asked for
+ * before the group exists rather than discovered in a settings tab after.
+ */
 export async function createGroup(
   uid: string,
   displayName: string,
   name: string,
+  shareFlags: ShareFlags,
   photoURL?: string,
 ): Promise<Group> {
   const ref = doc(groupsCollection());
@@ -107,7 +143,7 @@ export async function createGroup(
     displayName,
     ...(photoURL ? { photoURL } : {}),
     role: 'admin',
-    shareFlags: { ...DEFAULT_SHARING },
+    shareFlags: { ...DEFAULT_SHARING, ...shareFlags },
   };
 
   const batch = writeBatch(getDb());
@@ -140,6 +176,7 @@ export async function joinGroup(
   uid: string,
   displayName: string,
   rawCode: string,
+  shareFlags: ShareFlags,
   photoURL?: string,
 ): Promise<Group> {
   const code = normalizeInviteCode(rawCode);
@@ -152,19 +189,20 @@ export async function joinGroup(
   // is readable by members only. Joining is the one flow where that ordering
   // matters.
   const batch = writeBatch(getDb());
+  const flags = { ...DEFAULT_SHARING, ...shareFlags };
   batch.set(memberRef(groupId, uid), {
     uid,
     displayName,
     ...(photoURL ? { photoURL } : {}),
     role: 'member',
-    shareFlags: { ...DEFAULT_SHARING },
+    shareFlags: flags,
     joinedAt: serverTimestamp(),
   });
   batch.set(membershipRef(uid, groupId), {
     groupId,
     name,
     role: 'member',
-    shareFlags: { ...DEFAULT_SHARING },
+    shareFlags: flags,
     joinedAt: serverTimestamp(),
   });
   await batch.commit();
@@ -300,4 +338,35 @@ export async function getSharedSummary(
 ): Promise<SharedSummary | null> {
   const snap = await getDoc(sharedRef(groupId, uid));
   return snap.exists() ? (snap.data() as SharedSummary) : null;
+}
+
+/**
+ * Moves the group's "something happened" marker forward.
+ *
+ * The only field a plain member may change on the group document, which the
+ * rules enforce. Swallows its own failure: a dot on a tab is not worth
+ * failing a post over.
+ */
+export async function touchGroupActivity(groupId: string): Promise<void> {
+  await updateDoc(groupRef(groupId), { lastPostAt: serverTimestamp() }).catch(() => undefined);
+}
+
+/** Notes that this member has now seen the group, clearing their dot. */
+export async function markGroupSeen(uid: string, groupId: string): Promise<void> {
+  await updateDoc(membershipRef(uid, groupId), { lastSeenAt: serverTimestamp() })
+    .catch(() => undefined);
+}
+
+/**
+ * Records the highest achievement announced to a group.
+ *
+ * Written to the member's own pointer, so it is theirs to keep and nobody
+ * else can reset it to make the app repeat itself.
+ */
+export async function recordAnnounced(
+  uid: string,
+  groupId: string,
+  announced: { lastMilestone?: number; lastStreak?: number; lastCalorieWeek?: string },
+): Promise<void> {
+  await updateDoc(membershipRef(uid, groupId), announced).catch(() => undefined);
 }

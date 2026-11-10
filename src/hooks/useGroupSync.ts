@@ -5,33 +5,53 @@
 //
 //   1. Republish each group's mirror, so what the group sees is current and
 //      a gap in logging actually shows as one.
-//   2. Write the automatic posts for the period: this week's weight trend,
-//      today's rules if they were all kept, this week's progress photo.
+//   2. Add the day's automatic lines to each group's digest: this week's
+//      weight trend, a week whose calorie goal was met, today's rules if they
+//      were all kept, a weight milestone, a logging streak, this week's photo.
 //
 // It runs at most once a day per device, guarded by a note in localStorage,
-// because the whole job is a handful of reads and a handful of writes and
-// doing it on every navigation would be wasteful for no gain. Every write is
-// idempotent, so a second run after the guard is cleared changes nothing.
+// because the whole job is a handful of reads and doing it on every
+// navigation would be waste for no gain. Every write is idempotent, so a
+// second run after the guard is cleared changes nothing.
+//
+// The three achievements that persist — milestones, streaks and a met
+// calorie week — would otherwise be announced again every day for as long as
+// they stood. Each group's pointer records the highest already announced, so
+// each is said once.
 
 import { useEffect } from 'react';
 import { useAuth } from '../context/auth-context';
-import { listMyGroups, publishShare, type Membership } from '../data/groups';
+import {
+  listMyGroups, publishShare, recordAnnounced, type Membership,
+} from '../data/groups';
 import { postToGroups, groupsFor } from '../data/autopost';
 import { listDays } from '../data/days';
 import { listRules } from '../data/rules';
 import { listExercises } from '../data/workouts';
 import { listPhotos } from '../data/photos';
 import { buildSharedSummary } from '../lib/groups';
-import { photoPost, rulesPost, weightPost } from '../lib/feed';
+import {
+  calorieWeekPost, loggingStreak, milestonePost, milestonesReached, photoPost,
+  rulesPost, streakMilestone, streakPost, weightPost,
+} from '../lib/feed';
+import { goalOn } from '../lib/goals';
+import { paceSummary } from '../lib/pace';
+import { estimateMaintenance } from '../lib/maintenance';
+import { maintenanceBasis } from '../lib/pace';
 import { displayNameFor } from '../lib/display';
 import { addDays, startOfWeek, todayKey, toWeekKey } from '../lib/dates';
 import { appliesOn, isMet } from '../lib/rules';
 import { firstTrend, latestTrend, trendSeries } from '../lib/trend';
 import { fromKg } from '../lib/units';
 import type { User } from 'firebase/auth';
-import type { UserProfile } from '../lib/types';
+import type { DayLog, UserProfile } from '../lib/types';
 
 const GUARD = 'milo.groupSync';
+
+/** Far enough back to see a hundred-day streak, which is the longest we name. */
+const STREAK_LOOKBACK_DAYS = 101;
+/** Enough for the maintenance window and the four-week trend. */
+const BASE_LOOKBACK_DAYS = 28;
 
 function alreadyRanToday(uid: string, today: string): boolean {
   try {
@@ -62,13 +82,24 @@ async function sync(
     ...(user.photoURL ? { photo: user.photoURL } : {}),
   };
 
-  const needsPhotos = memberships.some((membership) => membership.shareFlags?.photos);
+  const sharesGoals = memberships.some((membership) => membership.shareFlags?.goals);
+  const sharesPhotos = memberships.some((membership) => membership.shareFlags?.photos);
+
+  // A streak longer than a month cannot be seen in a month of logs, so the
+  // read widens only when some group is actually listening for one. A hundred
+  // small documents once a day is well inside the free tier, and the local
+  // cache serves most of them.
+  const lookback = sharesGoals ? STREAK_LOOKBACK_DAYS : BASE_LOOKBACK_DAYS;
+
   const [days, rules, exercises, photos] = await Promise.all([
-    listDays(user.uid, addDays(today, -27), today),
+    listDays(user.uid, addDays(today, -(lookback - 1)), today),
     listRules(user.uid),
     listExercises(user.uid),
-    needsPhotos ? listPhotos(user.uid, 8) : Promise.resolve([]),
+    sharesPhotos ? listPhotos(user.uid, 8) : Promise.resolve([]),
   ]);
+
+  // The mirror has always described the last four weeks, whatever was read.
+  const recent = days.filter((day) => day.date >= addDays(today, -(BASE_LOOKBACK_DAYS - 1)));
 
   // ---- The mirrors -------------------------------------------------------
   await Promise.all(
@@ -80,7 +111,7 @@ async function sync(
         uid: user.uid,
         displayName: author.name,
         flags,
-        days,
+        days: recent,
         today,
         targetCalories: profile.calorieTarget,
         goalHistory: profile.goalHistory ?? [],
@@ -93,46 +124,122 @@ async function sync(
     }),
   );
 
-  // ---- This week's weight trend ------------------------------------------
+  const weekStart = startOfWeek(today);
+  const thisWeek = recent.filter((day) => day.date >= weekStart);
+  const week = toWeekKey(today);
+
+  // ---- This week's weight trend, and milestones toward the goal ----------
+  const trend = trendSeries(recent);
+  const latestKg = latestTrend(trend);
+
   if (groupsFor(memberships, 'weight').length > 0) {
-    const weekStart = startOfWeek(today);
-    const thisWeek = trendSeries(days.filter((day) => day.date >= weekStart));
-    const start = firstTrend(thisWeek);
-    const end = latestTrend(thisWeek);
+    const weekTrend = trendSeries(thisWeek);
+    const start = firstTrend(weekTrend);
+    const end = latestTrend(weekTrend);
 
     if (start !== null && end !== null) {
-      const spark = thisWeek
+      const spark = weekTrend
         .map((point) => point.trendKg)
         .filter((value): value is number => value !== null)
         .map((kg) => Number(fromKg(kg, profile.units).toFixed(2)));
 
+      await postToGroups(memberships, author, today, weightPost(end - start, profile.units, spark));
+    }
+  }
+
+  // ---- A week whose calorie goal was met ---------------------------------
+  const calorieGroups = groupsFor(memberships, 'calorieWeek');
+  if (calorieGroups.length > 0) {
+    const basis = maintenanceBasis(
+      estimateMaintenance(recent, today),
+      profile,
+      latestKg ?? undefined,
+    );
+    const pace = paceSummary({
+      days: recent,
+      start: weekStart,
+      end: today,
+      maintenanceCalories: basis.calories,
+      targetCalories: profile.calorieTarget,
+      goal: profile.goal,
+    });
+
+    // Met means the average is at or past what the goal asked for, with
+    // enough of the week logged to mean anything.
+    const met = pace.daysLogged >= 4 && pace.gapPerDay <= 0;
+    const unannounced = calorieGroups.filter(
+      (membership) => membership.lastCalorieWeek !== week,
+    );
+
+    if (met && unannounced.length > 0) {
+      await postToGroups(memberships, author, today, calorieWeekPost(pace.daysLogged));
+      await Promise.all(
+        unannounced.map((membership) =>
+          recordAnnounced(user.uid, membership.groupId, { lastCalorieWeek: week }),
+        ),
+      );
+    }
+  }
+
+  // ---- A weight milestone toward the current goal ------------------------
+  const milestoneGroups = groupsFor(memberships, 'milestone');
+  if (milestoneGroups.length > 0 && latestKg !== null) {
+    const period = goalOn(profile.goalHistory ?? [], today);
+    const startWeightKg = period?.startWeightKg ?? profile.weightKg;
+    const reached = milestonesReached(
+      startWeightKg, latestKg, period?.goal ?? profile.goal, profile.units,
+    );
+
+    const behind = milestoneGroups.filter(
+      (membership) => reached > (membership.lastMilestone ?? 0),
+    );
+    if (reached > 0 && behind.length > 0) {
       await postToGroups(
-        memberships, author, 'weight', toWeekKey(today),
-        weightPost(end - start, profile.units, spark),
+        memberships, author, today,
+        milestonePost(reached, profile.units, period?.goal ?? profile.goal),
+      );
+      await Promise.all(
+        behind.map((membership) =>
+          recordAnnounced(user.uid, membership.groupId, { lastMilestone: reached }),
+        ),
+      );
+    }
+  }
+
+  // ---- A logging streak worth naming -------------------------------------
+  const streakGroups = groupsFor(memberships, 'streak');
+  if (streakGroups.length > 0) {
+    const reached = streakMilestone(loggingStreak(days, today));
+    const behind = streakGroups.filter(
+      (membership) => reached > (membership.lastStreak ?? 0),
+    );
+
+    if (reached > 0 && behind.length > 0) {
+      await postToGroups(memberships, author, today, streakPost(reached));
+      await Promise.all(
+        behind.map((membership) =>
+          recordAnnounced(user.uid, membership.groupId, { lastStreak: reached }),
+        ),
       );
     }
   }
 
   // ---- Today's rules, if every one that applied was kept ------------------
   if (groupsFor(memberships, 'rules').length > 0) {
-    const day = days.find((entry) => entry.date === today);
+    const day: DayLog | undefined = recent.find((entry) => entry.date === today);
     const due = rules.filter((rule) => rule.active && appliesOn(rule, today));
     const met = due.filter((rule) => isMet(rule, day?.rules?.[rule.id]));
 
     if (due.length > 0 && met.length === due.length) {
-      await postToGroups(memberships, author, 'rules', today, rulesPost(due.length));
+      await postToGroups(memberships, author, today, rulesPost(due.length));
     }
   }
 
   // ---- This week's progress photo ----------------------------------------
   if (groupsFor(memberships, 'photo').length > 0) {
-    const week = toWeekKey(today);
-    const thisWeek = photos.find((photo) => photo.week === week);
-    if (thisWeek) {
-      await postToGroups(memberships, author, 'photo', week, {
-        ...photoPost(week),
-        thumbUrl: thisWeek.thumbUrl,
-      });
+    const shot = photos.find((photo) => photo.week === week);
+    if (shot) {
+      await postToGroups(memberships, author, today, photoPost(week, shot.thumbUrl));
     }
   }
 }

@@ -556,6 +556,93 @@ describe('the feed', () => {
   });
 });
 
+describe('the new-posts marker', () => {
+  it('lets any member say something was posted', async () => {
+    await assertSucceeds(
+      updateDoc(doc(asBob(), 'groups', GROUP), { lastPostAt: new Date() }),
+    );
+  });
+
+  it('stops a member changing anything else on the group', async () => {
+    await assertFails(
+      updateDoc(doc(asBob(), 'groups', GROUP), {
+        lastPostAt: new Date(), name: 'Hijacked',
+      }),
+    );
+    await assertFails(updateDoc(doc(asBob(), 'groups', GROUP), { adminUid: BOB }));
+  });
+
+  it('stops an outsider touching it', async () => {
+    await assertFails(
+      updateDoc(doc(asCarol(), 'groups', GROUP), { lastPostAt: new Date() }),
+    );
+  });
+});
+
+describe('digests', () => {
+  const digest = {
+    authorUid: BOB,
+    authorName: 'Bob',
+    kind: 'digest',
+    createdAt: new Date(),
+    items: { workout: { kind: 'workout', headline: 'Finished Legs' } },
+  };
+
+  it('lets a member add a line to their own digest', async () => {
+    await assertSucceeds(
+      setDoc(doc(asBob(), 'groups', GROUP, 'posts', `digest_${BOB}_2026-11-09`), digest),
+    );
+    // And a second line merges onto the same card rather than making another.
+    await assertSucceeds(
+      setDoc(
+        doc(asBob(), 'groups', GROUP, 'posts', `digest_${BOB}_2026-11-09`),
+        { items: { weight: { kind: 'weight', headline: 'Down 1 kg this week' } } },
+        { merge: true },
+      ),
+    );
+  });
+
+  it('stops a member adding a line to somebody else’s digest', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'groups', GROUP, 'posts', `digest_${BOB}_2026-11-09`),
+        digest,
+      );
+    });
+    await assertFails(
+      updateDoc(
+        doc(asAlice(), 'groups', GROUP, 'posts', `digest_${BOB}_2026-11-09`),
+        { items: { workout: { kind: 'workout', headline: 'Forged' } } },
+      ),
+    );
+  });
+
+  it('lets a member prune their own lines, which is what unsharing does', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(context.firestore(), 'groups', GROUP, 'posts', `digest_${BOB}_2026-11-09`),
+        { ...digest, reactions: { [ALICE]: 'fire' } },
+      );
+    });
+    // Taking the workout line off must not disturb the reactions on the card.
+    await assertSucceeds(
+      updateDoc(
+        doc(asBob(), 'groups', GROUP, 'posts', `digest_${BOB}_2026-11-09`),
+        { items: {} },
+      ),
+    );
+    await assertSucceeds(
+      deleteDoc(doc(asBob(), 'groups', GROUP, 'posts', `digest_${BOB}_2026-11-09`)),
+    );
+  });
+
+  it('stops a digest being written in somebody else’s name', async () => {
+    await assertFails(
+      setDoc(doc(asAlice(), 'groups', GROUP, 'posts', `digest_${BOB}_2026-11-10`), digest),
+    );
+  });
+});
+
 describe('reactions', () => {
   it('lets a member add their own reaction to another member’s post', async () => {
     await assertSucceeds(

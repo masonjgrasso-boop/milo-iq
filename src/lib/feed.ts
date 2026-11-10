@@ -1,26 +1,60 @@
 // The group feed: what a post is, and what each kind of post says.
 //
-// Two sorts of post share one shape. A note is something a member typed. An
-// automatic post is the app noticing something worth saying — a week's weight
-// trend, a day's rules kept, a workout finished, a progress photo — and
-// writing it in the member's name.
+// Two sorts of post share one shape. A note is something a member typed. A
+// digest is the app's own voice: everything worth saying about that person on
+// that day, gathered into a single card.
 //
-// Automatic posts carry a deterministic id built from the member, the kind
-// and the period it covers. Writing one is therefore idempotent: the app can
-// try to post "Monday's rules" as often as it likes and there will only ever
-// be one such post. Without that, every reopen of the app would add a
-// duplicate, and there is no backend here to clean up after it.
+// The digest is why automatic posts do not spam a feed. One member finishing
+// a workout, keeping their rules, hitting a weight milestone and passing a
+// 30-day streak on the same Tuesday is one card with four lines on it, not
+// four cards. It works because the post id is derived from the member and the
+// day, and each line is a keyed entry in a map on that post: writing a line
+// merges one key, so running the same check twice is a no-op and a later line
+// joins the card the earlier one made.
 //
 // Nothing here talks to Firestore. The wording lives here so it can be tested
 // without a network, and so the same sentence cannot drift between the feed
 // and anywhere else that renders a post.
 
 import { type DayKey, type WeekKey } from './dates';
-import { fromKg, weightUnitLabel } from './units';
+import { fromKg, lbToKg, weightUnitLabel } from './units';
 import type { ShareKey } from './groups';
-import type { UnitSystem } from './types';
+import type { Goal, UnitSystem } from './types';
 
-export type PostKind = 'note' | 'weight' | 'rules' | 'workout' | 'photo';
+/** A post is either somebody's own words or the app's daily digest. */
+export type PostKind = 'note' | 'digest';
+
+/** The things the app will speak up about. */
+export type ItemKind =
+  | 'weight'
+  | 'calorieWeek'
+  | 'rules'
+  | 'workout'
+  | 'milestone'
+  | 'streak'
+  | 'photo';
+
+/**
+ * Which sharing flag each line answers to.
+ *
+ * Stats are the two numbers; goals are the achievements. A note is the
+ * member's own words, typed deliberately into one group, so it is gated on
+ * nothing: choosing to write it is the choice.
+ */
+export const ITEM_FLAG: Record<ItemKind, ShareKey> = {
+  weight: 'stats',
+  calorieWeek: 'stats',
+  rules: 'goals',
+  workout: 'goals',
+  milestone: 'goals',
+  streak: 'goals',
+  photo: 'photos',
+};
+
+/** The order lines read in on a card, best news first. */
+export const ITEM_ORDER: ItemKind[] = [
+  'milestone', 'streak', 'calorieWeek', 'rules', 'workout', 'weight', 'photo',
+];
 
 export type Reaction = 'thumb' | 'fire' | 'flex';
 
@@ -30,21 +64,15 @@ export const REACTIONS: { key: Reaction; emoji: string; label: string }[] = [
   { key: 'flex', emoji: '\u{1F4AA}', label: 'Strong' },
 ];
 
-/**
- * Which sharing flag each kind of post answers to.
- *
- * A note is the member's own words, typed deliberately into one group, so it
- * is not gated on anything: choosing to write it is the choice. Everything
- * else is the app speaking on their behalf and only ever does so for a
- * category they have turned on.
- */
-export const KIND_FLAG: Record<PostKind, ShareKey | null> = {
-  note: null,
-  weight: 'weight',
-  rules: 'rules',
-  workout: 'workouts',
-  photo: 'photos',
-};
+/** One line on a digest card. */
+export interface PostItem {
+  kind: ItemKind;
+  headline: string;
+  detail?: string;
+  /** A few trend-weight points, in the author's units. */
+  spark?: number[];
+  thumbUrl?: string;
+}
 
 export interface FeedComment {
   id: string;
@@ -64,14 +92,11 @@ export interface FeedPost {
   createdAt?: unknown;
   /** What the member typed: the whole of a note, or a caption on a photo. */
   body?: string;
-  /** An automatic post's own sentence, written when the post was made. */
-  headline?: string;
-  detail?: string;
   /** A posted image, as a tokenised download URL. */
   imageUrl?: string;
   thumbUrl?: string;
-  /** A few trend-weight points, in the author's units, for a weight post. */
-  spark?: number[];
+  /** A digest's lines, keyed by kind so a repeat write replaces rather than adds. */
+  items?: Partial<Record<ItemKind, PostItem>>;
   /** uid to reaction. One each, which is what keeps this map small. */
   reactions?: Record<string, Reaction>;
 }
@@ -83,21 +108,21 @@ export const PAGE_SIZE = 20;
 export const MAX_BODY = 500;
 
 /**
- * The id for an automatic post.
+ * The id of a member's digest for a day.
  *
- * Deterministic on purpose: the same event always produces the same id, so
- * re-running the check that writes it can never duplicate it.
+ * Deterministic on purpose, and the whole anti-spam mechanism: every
+ * automatic line that day lands on this one document.
  */
-export function autoPostId(kind: PostKind, uid: string, period: string): string {
-  return `${kind}_${uid}_${period}`;
+export function digestId(uid: string, day: DayKey): string {
+  return `digest_${uid}_${day}`;
 }
 
-export interface AutoPostBody {
-  headline: string;
-  detail?: string;
-  spark?: number[];
-  /** A photo post carries the same thumbnail the group already sees. */
-  thumbUrl?: string;
+/** A digest's lines in reading order, with anything unrecognised dropped. */
+export function digestItems(post: FeedPost): PostItem[] {
+  const items = post.items ?? {};
+  return ITEM_ORDER.map((kind) => items[kind]).filter(
+    (item): item is PostItem => item !== undefined && typeof item.headline === 'string',
+  );
 }
 
 /**
@@ -111,7 +136,7 @@ export function weightPost(
   changeKg: number,
   units: UnitSystem,
   spark: number[] = [],
-): AutoPostBody {
+): PostItem {
   const unit = weightUnitLabel(units);
   const amount = Math.abs(fromKg(changeKg, units)).toFixed(1);
 
@@ -119,32 +144,133 @@ export function weightPost(
     ? 'Holding steady this week'
     : `${changeKg < 0 ? 'Down' : 'Up'} ${amount} ${unit} this week`;
 
-  return { headline, ...(spark.length > 1 ? { spark } : {}) };
+  return { kind: 'weight', headline, ...(spark.length > 1 ? { spark } : {}) };
 }
 
 /** A day on which every rule that applied was kept. */
-export function rulesPost(met: number): AutoPostBody {
+export function rulesPost(met: number): PostItem {
   return {
+    kind: 'rules',
     headline: met === 1 ? 'Hit their rule today' : `Hit all ${met} rules today`,
   };
 }
 
 /** A finished session, and anything in it that beat a previous best. */
-export function workoutPost(routineName: string, newBests: string[] = []): AutoPostBody {
+export function workoutPost(routineName: string, newBests: string[] = []): PostItem {
   const headline = `Finished ${routineName}`;
-  if (newBests.length === 0) return { headline };
+  if (newBests.length === 0) return { kind: 'workout', headline };
 
   const named = newBests.slice(0, 3).join(', ');
   const rest = newBests.length > 3 ? ` and ${newBests.length - 3} more` : '';
+  return { kind: 'workout', headline, detail: `New best on ${named}${rest}` };
+}
+
+/** A weekly progress photo. The thumbnail rides on the line itself. */
+export function photoPost(week: WeekKey, thumbUrl?: string): PostItem {
   return {
-    headline,
-    detail: `New best on ${named}${rest}`,
+    kind: 'photo',
+    headline: 'Posted a progress photo',
+    detail: week,
+    ...(thumbUrl ? { thumbUrl } : {}),
   };
 }
 
-/** A weekly progress photo. The thumbnail rides on the post itself. */
-export function photoPost(week: WeekKey): AutoPostBody {
-  return { headline: `Posted a progress photo`, detail: week };
+/** A week in which the average met the calorie goal. */
+export function calorieWeekPost(daysLogged: number): PostItem {
+  return {
+    kind: 'calorieWeek',
+    headline: 'Hit their calorie goal this week',
+    detail: `${daysLogged} ${daysLogged === 1 ? 'day' : 'days'} logged`,
+  };
+}
+
+/** Milestones are counted every 2 kg, or every 5 lb for imperial members. */
+export const MILESTONE_KG = 2;
+export const MILESTONE_LB = 5;
+
+export function milestoneStepKg(units: UnitSystem): number {
+  return units === 'metric' ? MILESTONE_KG : lbToKg(MILESTONE_LB);
+}
+
+/**
+ * How many whole milestones of progress toward the goal have been passed.
+ *
+ * Progress is measured in the goal's own direction from the weight recorded
+ * when that goal started, so switching from losing to gaining starts the
+ * count again rather than inheriting a tally that now means the opposite.
+ * Maintaining has no milestones: there is no direction to count in.
+ */
+export function milestonesReached(
+  startWeightKg: number,
+  currentKg: number,
+  goal: Goal,
+  units: UnitSystem,
+): number {
+  if (goal === 'maintain') return 0;
+  const progressKg = goal === 'lose' ? startWeightKg - currentKg : currentKg - startWeightKg;
+  if (!(progressKg > 0)) return 0;
+  return Math.floor(progressKg / milestoneStepKg(units));
+}
+
+export function milestonePost(count: number, units: UnitSystem, goal: Goal): PostItem {
+  const step = units === 'metric' ? MILESTONE_KG : MILESTONE_LB;
+  const unit = weightUnitLabel(units);
+  const total = count * step;
+
+  return {
+    kind: 'milestone',
+    headline: `${total} ${unit} ${goal === 'lose' ? 'down' : 'on'}`,
+    detail: goal === 'lose' ? 'Another milestone toward their goal' : 'Another milestone gained',
+  };
+}
+
+/** The streak lengths worth saying something about. */
+export const STREAK_MILESTONES = [7, 30, 100];
+
+/**
+ * Consecutive days with food logged, ending today or yesterday.
+ *
+ * Counting from yesterday when today is blank is deliberate: a streak should
+ * not appear broken at breakfast, before anyone has had a chance to log.
+ */
+export function loggingStreak(
+  days: { date: DayKey; calories: number }[],
+  today: DayKey,
+): number {
+  const logged = new Set(
+    days.filter((day) => day.calories > 0).map((day) => day.date),
+  );
+  if (logged.size === 0) return 0;
+
+  const step = (date: DayKey, back: number): DayKey => {
+    const at = new Date(`${date}T00:00:00`);
+    at.setDate(at.getDate() - back);
+    return at.toISOString().slice(0, 10);
+  };
+
+  const start = logged.has(today) ? today : step(today, 1);
+  if (!logged.has(start)) return 0;
+
+  let streak = 0;
+  while (logged.has(step(start, streak))) streak += 1;
+  return streak;
+}
+
+/** The highest streak milestone this streak has reached, or 0 for none. */
+export function streakMilestone(streak: number): number {
+  let reached = 0;
+  for (const milestone of STREAK_MILESTONES) {
+    if (streak >= milestone) reached = milestone;
+  }
+  return reached;
+}
+
+export function streakPost(days: number): PostItem {
+  return {
+    kind: 'streak',
+    headline: `${days} days logged in a row`,
+    detail: days >= 100 ? 'Three figures' : 'Still going',
+  };
 }
 
 /**
@@ -159,6 +285,31 @@ export function photoPost(week: WeekKey): AutoPostBody {
 export function visiblePosts(posts: FeedPost[], memberUids: string[]): FeedPost[] {
   const members = new Set(memberUids);
   return posts.filter((post) => members.has(post.authorUid));
+}
+
+/**
+ * A digest with the given kinds of line taken out, or null if nothing is
+ * left on it.
+ *
+ * This is what unticking a category does to history: a card that was only
+ * ever a workout line goes entirely, and one that also carried a weight line
+ * keeps that line and loses the rest.
+ */
+export function withoutItems(
+  items: Partial<Record<ItemKind, PostItem>> | undefined,
+  removing: ItemKind[],
+): Partial<Record<ItemKind, PostItem>> | null {
+  const kept: Partial<Record<ItemKind, PostItem>> = {};
+  for (const [kind, item] of Object.entries(items ?? {})) {
+    if (removing.includes(kind as ItemKind)) continue;
+    if (item) kept[kind as ItemKind] = item;
+  }
+  return Object.keys(kept).length === 0 ? null : kept;
+}
+
+/** Which lines a sharing flag is responsible for. */
+export function itemsFor(flag: ShareKey): ItemKind[] {
+  return (Object.keys(ITEM_FLAG) as ItemKind[]).filter((kind) => ITEM_FLAG[kind] === flag);
 }
 
 /** How many of each reaction a post has, and what the reader chose. */

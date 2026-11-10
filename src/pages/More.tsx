@@ -20,11 +20,6 @@ const LINKS = [
     sub: 'What your body actually burns, measured from your own logs',
   },
   {
-    to: '/groups',
-    title: 'Groups',
-    sub: 'Share only what you choose, with people you choose',
-  },
-  {
     to: '/account',
     title: 'Your data',
     sub: 'Export everything, or delete your account',
